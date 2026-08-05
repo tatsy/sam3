@@ -25,23 +25,23 @@ try:
     HAS_TIDE = True
 except ImportError:
     HAS_TIDE = False
-    print("WARNING: TIDE not installed. Detailed analysis will not be available.")
+    print('WARNING: TIDE not installed. Detailed analysis will not be available.')
 
 
 # the COCO detection metrics (https://github.com/cocodataset/cocoapi/blob/8c9bcc3cf640524c4c20a9c40e89cb6a2f2fa0e9/PythonAPI/pycocotools/cocoeval.py#L460-L471)
 COCO_METRICS = [
-    "AP",
-    "AP_50",
-    "AP_75",
-    "AP_small",
-    "AP_medium",
-    "AP_large",
-    "AR_maxDets@1",
-    "AR_maxDets@10",
-    "AR_maxDets@100",
-    "AR_small",
-    "AR_medium",
-    "AR_large",
+    'AP',
+    'AP_50',
+    'AP_75',
+    'AP_small',
+    'AP_medium',
+    'AP_large',
+    'AR_maxDets@1',
+    'AR_maxDets@10',
+    'AR_maxDets@100',
+    'AR_small',
+    'AR_medium',
+    'AR_large',
 ]
 
 
@@ -58,7 +58,7 @@ class HeapElement:
         self.val = val
 
     def __lt__(self, other):
-        return self.val["score"] < other.val["score"]
+        return self.val['score'] < other.val['score']
 
 
 class COCOevalCustom(COCOeval):
@@ -66,9 +66,7 @@ class COCOevalCustom(COCOeval):
     This is a slightly modified version of the original COCO API with added support for positive split evaluation.
     """
 
-    def __init__(
-        self, cocoGt=None, cocoDt=None, iouType="segm", dt_only_positive=False
-    ):
+    def __init__(self, cocoGt=None, cocoDt=None, iouType='segm', dt_only_positive=False):
         super().__init__(cocoGt, cocoDt, iouType)
         self.dt_only_positive = dt_only_positive
 
@@ -82,46 +80,39 @@ class COCOevalCustom(COCOeval):
             # modify ann['segmentation'] by reference
             for ann in anns:
                 rle = coco.annToRLE(ann)
-                ann["segmentation"] = rle
+                ann['segmentation'] = rle
 
         p = self.params
         if p.useCats:
-            gts = self.cocoGt.loadAnns(
-                self.cocoGt.getAnnIds(imgIds=p.imgIds, catIds=p.catIds)
-            )
-            dts = self.cocoDt.loadAnns(
-                self.cocoDt.getAnnIds(imgIds=p.imgIds, catIds=p.catIds)
-            )
+            gts = self.cocoGt.loadAnns(self.cocoGt.getAnnIds(imgIds=p.imgIds, catIds=p.catIds))
+            dts = self.cocoDt.loadAnns(self.cocoDt.getAnnIds(imgIds=p.imgIds, catIds=p.catIds))
         else:
             gts = self.cocoGt.loadAnns(self.cocoGt.getAnnIds(imgIds=p.imgIds))
             dts = self.cocoDt.loadAnns(self.cocoDt.getAnnIds(imgIds=p.imgIds))
 
         # convert ground truth to mask if iouType == 'segm'
-        if p.iouType == "segm":
+        if p.iouType == 'segm':
             _toMask(gts, self.cocoGt)
             _toMask(dts, self.cocoDt)
         # set ignore flag
         for gt in gts:
-            gt["ignore"] = gt["ignore"] if "ignore" in gt else 0
-            gt["ignore"] = "iscrowd" in gt and gt["iscrowd"]
-            if p.iouType == "keypoints":
-                gt["ignore"] = (gt["num_keypoints"] == 0) or gt["ignore"]
+            gt['ignore'] = gt['ignore'] if 'ignore' in gt else 0
+            gt['ignore'] = 'iscrowd' in gt and gt['iscrowd']
+            if p.iouType == 'keypoints':
+                gt['ignore'] = (gt['num_keypoints'] == 0) or gt['ignore']
         self._gts = defaultdict(list)  # gt for evaluation
         self._dts = defaultdict(list)  # dt for evaluation
 
         _gts_cat_ids = defaultdict(set)  # gt for evaluation on positive split
         for gt in gts:
-            self._gts[gt["image_id"], gt["category_id"]].append(gt)
-            _gts_cat_ids[gt["image_id"]].add(gt["category_id"])
+            self._gts[gt['image_id'], gt['category_id']].append(gt)
+            _gts_cat_ids[gt['image_id']].add(gt['category_id'])
 
         #### BEGIN MODIFICATION ####
         for dt in dts:
-            if (
-                self.dt_only_positive
-                and dt["category_id"] not in _gts_cat_ids[dt["image_id"]]
-            ):
+            if self.dt_only_positive and dt['category_id'] not in _gts_cat_ids[dt['image_id']]:
                 continue
-            self._dts[dt["image_id"], dt["category_id"]].append(dt)
+            self._dts[dt['image_id'], dt['category_id']].append(dt)
         #### END MODIFICATION ####
         self.evalImgs = defaultdict(list)  # per-image per-category evaluation results
         self.eval = {}  # accumulated evaluation results
@@ -132,7 +123,7 @@ class CocoEvaluatorOfflineWithPredFileEvaluators:
         self,
         gt_path,
         tide: bool = True,
-        iou_type: str = "bbox",
+        iou_type: str = 'bbox',
         positive_split=False,
     ):
         self.gt_path = gt_path
@@ -144,41 +135,37 @@ class CocoEvaluatorOfflineWithPredFileEvaluators:
         if not is_main_process():
             return {}
 
-        logging.info("OfflineCoco evaluator: Loading groundtruth")
+        logging.info('OfflineCoco evaluator: Loading groundtruth')
         self.gt = COCO(self.gt_path)
 
         # Creating the result file
-        logging.info("Coco evaluator: Creating the result file")
+        logging.info('Coco evaluator: Creating the result file')
         cocoDt = self.gt.loadRes(str(dumped_file))
 
         # Run the evaluation
-        logging.info("Coco evaluator: Running evaluation")
-        coco_eval = COCOevalCustom(
-            self.gt, cocoDt, iouType=self.iou_type, dt_only_positive=self.positive_split
-        )
+        logging.info('Coco evaluator: Running evaluation')
+        coco_eval = COCOevalCustom(self.gt, cocoDt, iouType=self.iou_type, dt_only_positive=self.positive_split)
         coco_eval.evaluate()
         coco_eval.accumulate()
         coco_eval.summarize()
 
         outs = {}
         for i, value in enumerate(coco_eval.stats):
-            outs[f"coco_eval_{self.iou_type}_{COCO_METRICS[i]}"] = value
+            outs[f'coco_eval_{self.iou_type}_{COCO_METRICS[i]}'] = value
 
         if self.tide_enabled:
-            logging.info("Coco evaluator: Loading TIDE")
+            logging.info('Coco evaluator: Loading TIDE')
             self.tide_gt = datasets.COCO(self.gt_path)
-            self.tide = TIDE(mode="mask" if self.iou_type == "segm" else "bbox")
+            self.tide = TIDE(mode='mask' if self.iou_type == 'segm' else 'bbox')
 
             # Run TIDE
-            logging.info("Coco evaluator: Running TIDE")
-            self.tide.evaluate(
-                self.tide_gt, datasets.COCOResult(str(dumped_file)), name="coco_eval"
-            )
+            logging.info('Coco evaluator: Running TIDE')
+            self.tide.evaluate(self.tide_gt, datasets.COCOResult(str(dumped_file)), name='coco_eval')
             self.tide.summarize()
-            for k, v in self.tide.get_main_errors()["coco_eval"].items():
-                outs[f"coco_eval_{self.iou_type}_TIDE_{k}"] = v
+            for k, v in self.tide.get_main_errors()['coco_eval'].items():
+                outs[f'coco_eval_{self.iou_type}_TIDE_{k}'] = v
 
-            for k, v in self.tide.get_special_errors()["coco_eval"].items():
-                outs[f"coco_eval_{self.iou_type}_TIDE_{k}"] = v
+            for k, v in self.tide.get_special_errors()['coco_eval'].items():
+                outs[f'coco_eval_{self.iou_type}_TIDE_{k}'] = v
 
         return outs

@@ -42,9 +42,7 @@ class _BaseMetric(ABC):
     def plot_single_tracker_results(self, all_res, tracker, output_folder, cls):
         """Plot results of metrics, only valid for metrics with self.plottable"""
         if self.plottable:
-            raise NotImplementedError(
-                "plot_results is not implemented for metric %s" % self.get_name()
-            )
+            raise NotImplementedError('plot_results is not implemented for metric %s' % self.get_name())
         else:
             pass
 
@@ -63,21 +61,17 @@ class _BaseMetric(ABC):
     @staticmethod
     def _combine_weighted_av(all_res, field, comb_res, weight_field):
         """Combine sequence results via weighted average"""
-        return sum(
-            [all_res[k][field] * all_res[k][weight_field] for k in all_res.keys()]
-        ) / np.maximum(1.0, comb_res[weight_field])
-
-    def print_table(
-        self, table_res, tracker, cls, res_field="COMBINED_SEQ", output_lable="COMBINED"
-    ):
-        """Prints table of results for all sequences"""
-        print("")
-        metric_name = self.get_name()
-        self._row_print(
-            [metric_name + ": " + tracker + "-" + cls] + self.summary_fields
+        return sum([all_res[k][field] * all_res[k][weight_field] for k in all_res.keys()]) / np.maximum(
+            1.0, comb_res[weight_field]
         )
+
+    def print_table(self, table_res, tracker, cls, res_field='COMBINED_SEQ', output_lable='COMBINED'):
+        """Prints table of results for all sequences"""
+        print('')
+        metric_name = self.get_name()
+        self._row_print([metric_name + ': ' + tracker + '-' + cls] + self.summary_fields)
         for seq, results in sorted(table_res.items()):
-            if seq.startswith("COMBINED_SEQ"):
+            if seq.startswith('COMBINED_SEQ'):
                 continue
             summary_res = self._summary_row(results)
             self._row_print([seq] + summary_res)
@@ -88,15 +82,13 @@ class _BaseMetric(ABC):
         vals = []
         for h in self.summary_fields:
             if h in self.float_array_fields:
-                vals.append("{0:1.5g}".format(100 * np.mean(results_[h])))
+                vals.append('{0:1.5g}'.format(100 * np.mean(results_[h])))
             elif h in self.float_fields:
-                vals.append("{0:1.5g}".format(100 * float(results_[h])))
+                vals.append('{0:1.5g}'.format(100 * float(results_[h])))
             elif h in self.integer_fields:
-                vals.append("{0:d}".format(int(results_[h])))
+                vals.append('{0:d}'.format(int(results_[h])))
             else:
-                raise NotImplementedError(
-                    "Summary function not implemented for this field type."
-                )
+                raise NotImplementedError('Summary function not implemented for this field type.')
         return vals
 
     @staticmethod
@@ -104,16 +96,14 @@ class _BaseMetric(ABC):
         """Prints results in an evenly spaced rows, with more space in first row"""
         if len(argv) == 1:
             argv = argv[0]
-        to_print = "%-35s" % argv[0]
+        to_print = '%-35s' % argv[0]
         for v in argv[1:]:
-            to_print += "%-10s" % str(v)
+            to_print += '%-10s' % str(v)
         print(to_print)
 
     def summary_results(self, table_res):
         """Returns a simple summary of final results for a tracker"""
-        return dict(
-            zip(self.summary_fields, self._summary_row(table_res["COMBINED_SEQ"]))
-        )
+        return dict(zip(self.summary_fields, self._summary_row(table_res['COMBINED_SEQ'])))
 
     def detailed_results(self, table_res):
         """Returns detailed final results for a tracker"""
@@ -121,8 +111,8 @@ class _BaseMetric(ABC):
         detailed_fields = self.float_fields + self.integer_fields
         for h in self.float_array_fields + self.integer_array_fields:
             for alpha in [int(100 * x) for x in self.array_labels]:
-                detailed_fields.append(h + "___" + str(alpha))
-            detailed_fields.append(h + "___AUC")
+                detailed_fields.append(h + '___' + str(alpha))
+            detailed_fields.append(h + '___AUC')
 
         # Get detailed results
         detailed_results = {}
@@ -130,8 +120,7 @@ class _BaseMetric(ABC):
             detailed_row = self._detailed_row(res)
             if len(detailed_row) != len(detailed_fields):
                 raise TrackEvalException(
-                    "Field names and data have different sizes (%i and %i)"
-                    % (len(detailed_row), len(detailed_fields))
+                    'Field names and data have different sizes (%i and %i)' % (len(detailed_row), len(detailed_fields))
                 )
             detailed_results[seq] = dict(zip(detailed_fields, detailed_row))
         return detailed_results

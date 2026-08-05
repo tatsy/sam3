@@ -47,7 +47,7 @@ from timm.models.layers import trunc_normal_
 # a large negative value as a placeholder score for missing objects
 NO_OBJ_SCORE = -1024.0
 
-neck_outs = ["interactive", "sam2_backbone_out"]
+neck_outs = ['interactive', 'sam2_backbone_out']
 
 
 class SAMOutput(TypedDict, total=True):
@@ -152,7 +152,7 @@ class VideoTrackingMultiplex(nn.Module):
         # method for point sampling during evaluation
         # "uniform" (sample uniformly from error region) or "center" (use the point with the largest distance to error region boundary)
         # default to "center" to be consistent with evaluation in the SAM paper
-        pt_sampling_for_eval: Literal["uniform", "center"] = "center",
+        pt_sampling_for_eval: Literal['uniform', 'center'] = 'center',
         # During training, we optionally allow sampling the correction points from GT regions
         # instead of the prediction error regions with a small probability. This might allow the
         # model to overfit less to the error regions in training datasets
@@ -272,14 +272,10 @@ class VideoTrackingMultiplex(nn.Module):
         # the interactive sam mask deocder can use dynamic_multimask_via_stability
         interactive_sam_mask_decoder_extra_args = deepcopy(sam_mask_decoder_extra_args)
         if sam_mask_decoder_extra_args is not None:
-            dynamic_multimask_via_stability = sam_mask_decoder_extra_args.get(
-                "dynamic_multimask_via_stability", False
-            )
+            dynamic_multimask_via_stability = sam_mask_decoder_extra_args.get('dynamic_multimask_via_stability', False)
             if dynamic_multimask_via_stability:
-                sam_mask_decoder_extra_args["dynamic_multimask_via_stability"] = False
-                print(
-                    "dynamic_multimask_via_stability is reset to False in the multiplex model"
-                )
+                sam_mask_decoder_extra_args['dynamic_multimask_via_stability'] = False
+                print('dynamic_multimask_via_stability is reset to False in the multiplex model')
 
         # Part 1: the image backbone
         self.backbone = backbone
@@ -292,9 +288,7 @@ class VideoTrackingMultiplex(nn.Module):
             # A conv layer to downsample the GT mask prompt to stride 4 (the same stride as
             # low-res SAM mask logits) and to change its scales from 0~1 to SAM logit scale,
             # so that it can be fed into the SAM mask decoder to generate a pointer.
-            self.interactive_mask_downsample = torch.nn.Conv2d(
-                1, 1, kernel_size=4, stride=4
-            )
+            self.interactive_mask_downsample = torch.nn.Conv2d(1, 1, kernel_size=4, stride=4)
 
         self.add_tpos_enc_to_obj_ptrs = add_tpos_enc_to_obj_ptrs
         if proj_tpos_enc_in_obj_ptrs:
@@ -308,7 +302,7 @@ class VideoTrackingMultiplex(nn.Module):
 
         # Part 2: encoder-only transformer to fuse current frame's visual features
         # with memories from past frames
-        assert transformer.decoder is None, "transformer should be encoder-only"
+        assert transformer.decoder is None, 'transformer should be encoder-only'
         self.transformer = transformer
         # pyre-fixme[8]: Attribute has type `int`; used as `Union[Module, Tensor]`.
         self.hidden_dim: int = transformer.d_model
@@ -316,16 +310,12 @@ class VideoTrackingMultiplex(nn.Module):
         # Part 3: memory encoder for the previous frame's outputs
         self.maskmem_backbone = maskmem_backbone
         self.mem_dim = self.hidden_dim
-        if hasattr(self.maskmem_backbone, "out_proj") and hasattr(
-            self.maskmem_backbone.out_proj, "weight"
-        ):
+        if hasattr(self.maskmem_backbone, 'out_proj') and hasattr(self.maskmem_backbone.out_proj, 'weight'):
             # if there is compression of memories along channel dim
             # pyre-fixme[16]: Item `Tensor` of `Tensor | Module` has no attribute
             #  `weight`.
             mem_dim = self.maskmem_backbone.out_proj.weight.shape[0]
-            assert mem_dim == self.hidden_dim, (
-                "there should be no compression of memory embeddings"
-            )
+            assert mem_dim == self.hidden_dim, 'there should be no compression of memory embeddings'
         self.num_maskmem = num_maskmem  # Number of memories accessible
         # Temporal encoding of the memories
         self.sincos_tpos_enc = sincos_tpos_enc
@@ -333,23 +323,17 @@ class VideoTrackingMultiplex(nn.Module):
         # tpos specific to spatial memories only
         # last token actually corresponds to conditioning
         # frame embedding, indep of temporal position
-        self.maskmem_tpos_enc = torch.nn.Parameter(
-            torch.zeros(num_maskmem, 1, 1, self.mem_dim)
-        )
+        self.maskmem_tpos_enc = torch.nn.Parameter(torch.zeros(num_maskmem, 1, 1, self.mem_dim))
         trunc_normal_(self.maskmem_tpos_enc, std=0.02)
 
         # a single token to indicate no memory embedding from previous frames
-        self.interactivity_no_mem_embed = torch.nn.Parameter(
-            torch.zeros(1, 1, self.hidden_dim)
-        )
+        self.interactivity_no_mem_embed = torch.nn.Parameter(torch.zeros(1, 1, self.hidden_dim))
         trunc_normal_(self.interactivity_no_mem_embed, std=0.02)
         self.directly_add_no_mem_embed = directly_add_no_mem_embed
 
         # Whether to apply sigmoid to the output raw mask logits (to turn them from
         # range (-inf, +inf) to range (0, 1)) before feeding them into the memory encoder
-        self.apply_sigmoid_to_mask_logits_for_mem_enc = (
-            apply_sigmoid_to_mask_logits_for_mem_enc
-        )
+        self.apply_sigmoid_to_mask_logits_for_mem_enc = apply_sigmoid_to_mask_logits_for_mem_enc
         if apply_sigmoid_to_mask_logits_for_mem_enc:
             self.sigmoid_scale_for_mem_enc = sigmoid_scale_for_mem_enc
             self.sigmoid_bias_for_mem_enc = sigmoid_bias_for_mem_enc
@@ -402,13 +386,11 @@ class VideoTrackingMultiplex(nn.Module):
         self.offload_output_to_cpu_for_eval = offload_output_to_cpu_for_eval
         if trim_past_non_cond_mem_for_eval:
             assert num_frames_to_correct_for_eval <= 1, (
-                "trim_past_non_cond_mem_for_eval=True requires that only the first frame receives prompts"
+                'trim_past_non_cond_mem_for_eval=True requires that only the first frame receives prompts'
             )
         self.trim_past_non_cond_mem_for_eval = trim_past_non_cond_mem_for_eval
         self.sam_mask_decoder_extra_args = sam_mask_decoder_extra_args
-        self.interactive_sam_mask_decoder_extra_args = (
-            interactive_sam_mask_decoder_extra_args
-        )
+        self.interactive_sam_mask_decoder_extra_args = interactive_sam_mask_decoder_extra_args
         self.pred_obj_scores = pred_obj_scores
         self.pred_obj_scores_mlp = pred_obj_scores_mlp
         self.fixed_no_obj_ptr = fixed_no_obj_ptr
@@ -418,41 +400,27 @@ class VideoTrackingMultiplex(nn.Module):
         if self.fixed_no_obj_ptr:
             assert self.pred_obj_scores
             assert self.use_obj_ptrs_in_encoder
-        if (
-            self.pred_obj_scores
-            and self.use_obj_ptrs_in_encoder
-            and self.use_no_obj_ptr
-        ):
+        if self.pred_obj_scores and self.use_obj_ptrs_in_encoder and self.use_no_obj_ptr:
             if self.use_linear_no_obj_ptr:
                 self.no_obj_ptr_linear = nn.Linear(self.hidden_dim, self.hidden_dim)
             else:
-                self.no_obj_ptr = torch.nn.Parameter(
-                    torch.zeros(self.multiplex_count, self.hidden_dim)
-                )
+                self.no_obj_ptr = torch.nn.Parameter(torch.zeros(self.multiplex_count, self.hidden_dim))
                 trunc_normal_(self.no_obj_ptr, std=0.02)
 
         self.use_mlp_for_obj_ptr_proj = use_mlp_for_obj_ptr_proj
         self.no_obj_embed_spatial = None
         if no_obj_embed_spatial:
-            self.no_obj_embed_spatial = torch.nn.Parameter(
-                torch.zeros(self.multiplex_count, self.hidden_dim)
-            )
+            self.no_obj_embed_spatial = torch.nn.Parameter(torch.zeros(self.multiplex_count, self.hidden_dim))
             trunc_normal_(self.no_obj_embed_spatial, std=0.02)
         self.num_multimask_outputs = num_multimask_outputs
         self.decode_mask_with_shared_tokens = decode_mask_with_shared_tokens
-        self.decode_mask_attribute_with_shared_tokens = (
-            decode_mask_attribute_with_shared_tokens
-        )
+        self.decode_mask_attribute_with_shared_tokens = decode_mask_attribute_with_shared_tokens
         self.share_necks = share_necks
 
         self.add_output_suppression_embeddings = add_output_suppression_embeddings
         if self.add_output_suppression_embeddings:
-            self.output_valid_embed = torch.nn.Parameter(
-                torch.zeros(self.multiplex_count, self.hidden_dim)
-            )
-            self.output_invalid_embed = torch.nn.Parameter(
-                torch.zeros(self.multiplex_count, self.hidden_dim)
-            )
+            self.output_valid_embed = torch.nn.Parameter(torch.zeros(self.multiplex_count, self.hidden_dim))
+            self.output_invalid_embed = torch.nn.Parameter(torch.zeros(self.multiplex_count, self.hidden_dim))
             trunc_normal_(self.output_valid_embed, std=0.02)
             trunc_normal_(self.output_invalid_embed, std=0.02)
         self.add_object_conditional_embeddings = add_object_conditional_embeddings
@@ -466,15 +434,11 @@ class VideoTrackingMultiplex(nn.Module):
             # such that the features are more "balanced"
             # these three sets should be disjoint and their union should cover all objects
             # for conditioning objects
-            self.obj_cond_embed = torch.nn.Parameter(
-                torch.zeros(self.multiplex_count, self.hidden_dim)
-            )
+            self.obj_cond_embed = torch.nn.Parameter(torch.zeros(self.multiplex_count, self.hidden_dim))
             trunc_normal_(self.obj_cond_embed, std=0.02)
             if self.add_object_unconditional_embeddings:
                 # for non-conditioning objects
-                self.obj_non_cond_embed = torch.nn.Parameter(
-                    torch.zeros(self.multiplex_count, self.hidden_dim)
-                )
+                self.obj_non_cond_embed = torch.nn.Parameter(torch.zeros(self.multiplex_count, self.hidden_dim))
                 trunc_normal_(self.obj_non_cond_embed, std=0.02)
 
         self.condition_as_mask_input = condition_as_mask_input
@@ -491,7 +455,7 @@ class VideoTrackingMultiplex(nn.Module):
         self.prob_to_use_pt_input_for_eval = prob_to_use_pt_input_for_eval
         self.prob_to_use_box_input_for_eval = prob_to_use_box_input_for_eval
         if prob_to_use_pt_input_for_train > 0 or prob_to_use_pt_input_for_eval > 0:
-            logging.info("Using points (sampled from masks) as inputs")
+            logging.info('Using points (sampled from masks) as inputs')
             assert num_frames_to_correct_for_train >= num_init_cond_frames_for_train
             assert num_frames_to_correct_for_eval >= num_init_cond_frames_for_eval
         self.num_frames_to_correct_for_train = num_frames_to_correct_for_train
@@ -499,13 +463,9 @@ class VideoTrackingMultiplex(nn.Module):
         self.rand_frames_to_correct_for_train = rand_frames_to_correct_for_train
         self.rand_frames_to_correct_for_eval = rand_frames_to_correct_for_eval
         self.prob_correct_all_objects_for_train = prob_correct_all_objects_for_train
-        self.ratio_of_objects_to_correct_for_train = (
-            ratio_of_objects_to_correct_for_train
-        )
+        self.ratio_of_objects_to_correct_for_train = ratio_of_objects_to_correct_for_train
         self.rand_objects_to_correct_for_train = rand_objects_to_correct_for_train
-        self.force_correct_all_for_conditional_inputs = (
-            force_correct_all_for_conditional_inputs
-        )
+        self.force_correct_all_for_conditional_inputs = force_correct_all_for_conditional_inputs
         # Initial multi-conditioning frames
         self.num_init_cond_frames_for_train = num_init_cond_frames_for_train
         self.num_init_cond_frames_for_eval = num_init_cond_frames_for_eval
@@ -538,14 +498,9 @@ class VideoTrackingMultiplex(nn.Module):
             return torch.zeros(len(rel_pos_list), self.mem_dim, device=device)
 
         t_diff_max = max_abs_pos - 1 if max_abs_pos is not None else 1
-        pos_enc = (
-            torch.tensor(rel_pos_list).pin_memory().to(device=device, non_blocking=True)
-            / t_diff_max
-        )
+        pos_enc = torch.tensor(rel_pos_list).pin_memory().to(device=device, non_blocking=True) / t_diff_max
         if self.sincos_tpos_enc:
-            tpos_dim = (
-                self.hidden_dim if self.proj_tpos_enc_in_obj_ptrs else self.mem_dim
-            )
+            tpos_dim = self.hidden_dim if self.proj_tpos_enc_in_obj_ptrs else self.mem_dim
             pos_enc = get_1d_sine_pe(pos_enc, dim=tpos_dim)
         else:
             raise NotImplementedError
@@ -614,24 +569,17 @@ class VideoTrackingMultiplex(nn.Module):
             use_multimask_token_for_obj_ptr=self.use_multimask_token_for_obj_ptr,
             decode_mask_with_shared_tokens=self.decode_mask_with_shared_tokens,
             decode_mask_attribute_with_shared_tokens=self.decode_mask_attribute_with_shared_tokens,
-            multimask_outputs_only=self.num_multimask_outputs > 0
-            and self.multimask_output_in_sam,
+            multimask_outputs_only=self.num_multimask_outputs > 0 and self.multimask_output_in_sam,
             **(self.sam_mask_decoder_extra_args or {}),
         )
 
         if self.use_obj_ptrs_in_encoder:
             # a linear projection on SAM output tokens to turn them into object pointers
             self.obj_ptr_proj = torch.nn.Linear(self.hidden_dim, self.hidden_dim)
-            self.interactive_obj_ptr_proj = torch.nn.Linear(
-                self.hidden_dim, self.hidden_dim
-            )
+            self.interactive_obj_ptr_proj = torch.nn.Linear(self.hidden_dim, self.hidden_dim)
             if self.use_mlp_for_obj_ptr_proj:
-                self.obj_ptr_proj = MLP(
-                    self.hidden_dim, self.hidden_dim, self.hidden_dim, 3
-                )
-                self.interactive_obj_ptr_proj = MLP(
-                    self.hidden_dim, self.hidden_dim, self.hidden_dim, 3
-                )
+                self.obj_ptr_proj = MLP(self.hidden_dim, self.hidden_dim, self.hidden_dim, 3)
+                self.interactive_obj_ptr_proj = MLP(self.hidden_dim, self.hidden_dim, self.hidden_dim, 3)
         else:
             self.obj_ptr_proj = torch.nn.Identity()
             self.interactive_obj_ptr_proj = torch.nn.Identity()
@@ -642,9 +590,7 @@ class VideoTrackingMultiplex(nn.Module):
         else:
             self.obj_ptr_tpos_proj = torch.nn.Identity()
 
-    def _get_interactive_pix_mem(
-        self, features: torch.Tensor, feat_sizes: list[tuple]
-    ) -> torch.Tensor:
+    def _get_interactive_pix_mem(self, features: torch.Tensor, feat_sizes: list[tuple]) -> torch.Tensor:
         assert self.directly_add_no_mem_embed
         pix_feat_with_mem = features[-1] + self.interactivity_no_mem_embed
         B = features[-1].size(1)  # batch size on this frame
@@ -723,32 +669,25 @@ class VideoTrackingMultiplex(nn.Module):
 
             # a) Handle point prompts
             if point_inputs is not None:
-                sam_point_coords = point_inputs["point_coords"]
-                sam_point_labels = point_inputs["point_labels"]
+                sam_point_coords = point_inputs['point_coords']
+                sam_point_labels = point_inputs['point_labels']
             else:
                 assert mask_inputs is not None
                 # If no points are provided, pad with an empty point (with label -1)
-                sam_point_coords = torch.zeros(
-                    mask_inputs.shape[0], 1, 2, device=device
-                )
-                sam_point_labels = -torch.ones(
-                    mask_inputs.shape[0], 1, dtype=torch.int32, device=device
-                )
+                sam_point_coords = torch.zeros(mask_inputs.shape[0], 1, 2, device=device)
+                sam_point_labels = -torch.ones(mask_inputs.shape[0], 1, dtype=torch.int32, device=device)
 
             # b) Handle mask prompts
             if mask_inputs is not None:
                 # If mask_inputs is provided, downsize it into low-res mask input if needed
                 # and feed it as a dense mask prompt into the SAM mask encoder
                 assert len(mask_inputs.shape) == 4
-                if (
-                    mask_inputs.shape[-2:]
-                    != self.interactive_sam_prompt_encoder.mask_input_size
-                ):
+                if mask_inputs.shape[-2:] != self.interactive_sam_prompt_encoder.mask_input_size:
                     sam_mask_prompt = F.interpolate(
                         mask_inputs.float(),
                         size=self.interactive_sam_prompt_encoder.mask_input_size,
                         align_corners=False,
-                        mode="bilinear",
+                        mode='bilinear',
                         antialias=True,  # use antialias for downsampling
                     )
                 else:
@@ -768,9 +707,7 @@ class VideoTrackingMultiplex(nn.Module):
             # to enable compilation
             sparse_embeddings = self._maybe_clone(sparse_embeddings)
             dense_embeddings = self._maybe_clone(dense_embeddings)
-            image_pe = self._maybe_clone(
-                self.interactive_sam_prompt_encoder.get_dense_pe()
-            )
+            image_pe = self._maybe_clone(self.interactive_sam_prompt_encoder.get_dense_pe())
             (
                 low_res_multimasks,
                 ious,
@@ -797,12 +734,9 @@ class VideoTrackingMultiplex(nn.Module):
                 # the suppression embeddings inform the mask decoder the objects that should be decoded
                 output_valid_embed = self.output_valid_embed.unsqueeze(0)
                 output_invalid_embed = self.output_invalid_embed.unsqueeze(0)
-                valid_object_mask = (
-                    multiplex_state.get_valid_object_mask().unsqueeze(-1).float()
-                )
+                valid_object_mask = multiplex_state.get_valid_object_mask().unsqueeze(-1).float()
                 output_merged_embed = (
-                    valid_object_mask * output_valid_embed
-                    + (1 - valid_object_mask) * output_invalid_embed
+                    valid_object_mask * output_valid_embed + (1 - valid_object_mask) * output_invalid_embed
                 )
             else:
                 output_merged_embed = None
@@ -816,10 +750,10 @@ class VideoTrackingMultiplex(nn.Module):
                 multimask_output=multimask_output,
                 extra_per_object_embeddings=output_merged_embed,
             )
-            low_res_multimasks = out["masks"]  # [B, M, 3/1, H*4, W*4]
-            ious = out["iou_pred"]  # [B, M, 3/1]
-            sam_output_tokens = out["sam_tokens_out"]  # [B, M, 3/1, C]
-            object_score_logits = out["object_score_logits"]
+            low_res_multimasks = out['masks']  # [B, M, 3/1, H*4, W*4]
+            ious = out['iou_pred']  # [B, M, 3/1]
+            sam_output_tokens = out['sam_tokens_out']  # [B, M, 3/1, C]
+            object_score_logits = out['object_score_logits']
 
             low_res_multimasks = multiplex_state.demux(low_res_multimasks)
             ious = multiplex_state.demux(ious)
@@ -853,20 +787,16 @@ class VideoTrackingMultiplex(nn.Module):
         high_res_multimasks = F.interpolate(
             low_res_multimasks,
             size=(self.image_size, self.image_size),
-            mode="bilinear",
+            mode='bilinear',
             align_corners=False,
         )
 
         sam_output_token = sam_output_tokens[:, 0]
-        if multimask_output and (
-            not self.decode_mask_with_shared_tokens or is_interactive
-        ):
+        if multimask_output and (not self.decode_mask_with_shared_tokens or is_interactive):
             # take the best mask prediction (with the highest IoU estimation)
             if self.stability_score_attentuation:
                 # prefer selecting masks with high stability score
-                stability_score = self.sam_mask_decoder._get_stability_scores(
-                    low_res_multimasks
-                )
+                stability_score = self.sam_mask_decoder._get_stability_scores(low_res_multimasks)
                 ious = ious * stability_score
 
             best_iou_inds = torch.argmax(ious, dim=-1)
@@ -906,30 +836,26 @@ class VideoTrackingMultiplex(nn.Module):
                         obj_ptr = lambda_is_obj_appearing * obj_ptr
 
                     # use demux to locate the corresponding no_obj_ptr entries
-                    selected_no_obj_ptr = self.no_obj_ptr.unsqueeze(0).repeat(
-                        multiplex_state.num_buckets, 1, 1
-                    )
+                    selected_no_obj_ptr = self.no_obj_ptr.unsqueeze(0).repeat(multiplex_state.num_buckets, 1, 1)
                     selected_no_obj_ptr = multiplex_state.demux(selected_no_obj_ptr)
                     if is_interactive:
                         # if is_interactive, the object pointers are in the data space
                         selected_no_obj_ptr = selected_no_obj_ptr[objects_to_interact]
 
-                    obj_ptr = (
-                        obj_ptr + (1 - lambda_is_obj_appearing) * selected_no_obj_ptr
-                    )
+                    obj_ptr = obj_ptr + (1 - lambda_is_obj_appearing) * selected_no_obj_ptr
 
         # pyrefly: ignore [bad-typed-dict-key]
         outputs: SAMOutput = {
-            "low_res_multimasks": low_res_multimasks,
-            "high_res_multimasks": high_res_multimasks,
-            "ious": ious,
-            "low_res_masks": low_res_masks,
-            "high_res_masks": high_res_masks,
-            "object_score_logits": object_score_logits,
+            'low_res_multimasks': low_res_multimasks,
+            'high_res_multimasks': high_res_multimasks,
+            'ious': ious,
+            'low_res_masks': low_res_masks,
+            'high_res_masks': high_res_masks,
+            'object_score_logits': object_score_logits,
         }
         if self.use_obj_ptrs_in_encoder:
             # pyre-fixme[61]: `obj_ptr` is undefined, or not always defined.
-            outputs["obj_ptr"] = obj_ptr  # [num_objects, C], in data space
+            outputs['obj_ptr'] = obj_ptr  # [num_objects, C], in data space
         return outputs
 
     def _use_mask_as_output(
@@ -950,21 +876,17 @@ class VideoTrackingMultiplex(nn.Module):
         # Use -10/+10 as logits for neg/pos pixels (very close to 0/1 in prob after sigmoid).
         out_scale, out_bias = 20.0, -10.0  # sigmoid(-10.0)=4.5398e-05
         mask_inputs_float = mask_inputs.to(backbone_features.dtype)
-        assert mask_inputs.shape[0] == len(objects_in_mask), (
-            f"{mask_inputs.shape[0]} != {len(objects_in_mask)}"
-        )
+        assert mask_inputs.shape[0] == len(objects_in_mask), f'{mask_inputs.shape[0]} != {len(objects_in_mask)}'
         high_res_masks = mask_inputs_float * out_scale + out_bias
         low_res_masks = F.interpolate(
             high_res_masks,
             size=(high_res_masks.size(-2) // 4, high_res_masks.size(-1) // 4),
             align_corners=False,
-            mode="bilinear",
+            mode='bilinear',
             antialias=True,  # use antialias for downsampling
         )
         # a dummy IoU prediction of all 1's under mask input
-        ious = mask_inputs.new_ones(
-            mask_inputs.size(0), 1, dtype=backbone_features.dtype
-        )
+        ious = mask_inputs.new_ones(mask_inputs.size(0), 1, dtype=backbone_features.dtype)
 
         if self.use_obj_ptrs_in_encoder:
             # produce an object pointer using the SAM decoder from the mask input
@@ -976,7 +898,7 @@ class VideoTrackingMultiplex(nn.Module):
                 objects_to_interact=objects_in_mask,
                 multiplex_state=multiplex_state,
             )
-            obj_ptr = sam_outputs["obj_ptr"]
+            obj_ptr = sam_outputs['obj_ptr']
 
             # In this method, we are treating mask_input as output, e.g. using it directly to create spatial mem;
             # Below, we follow the same design axiom to use mask_input to decide if obj appears or not instead of relying
@@ -998,36 +920,30 @@ class VideoTrackingMultiplex(nn.Module):
                     if self.fixed_no_obj_ptr:
                         obj_ptr = lambda_is_obj_appearing * obj_ptr
                     # use demux to locate the corresponding no_obj_ptr entries
-                    selected_no_obj_ptr = self.no_obj_ptr.unsqueeze(0).repeat(
-                        multiplex_state.num_buckets, 1, 1
-                    )
+                    selected_no_obj_ptr = self.no_obj_ptr.unsqueeze(0).repeat(multiplex_state.num_buckets, 1, 1)
                     selected_no_obj_ptr = multiplex_state.demux(selected_no_obj_ptr)
                     selected_no_obj_ptr = selected_no_obj_ptr[objects_in_mask]
-                    obj_ptr = (
-                        obj_ptr + (1 - lambda_is_obj_appearing) * selected_no_obj_ptr
-                    )
+                    obj_ptr = obj_ptr + (1 - lambda_is_obj_appearing) * selected_no_obj_ptr
 
         # pyrefly: ignore [bad-typed-dict-key]
         outputs: SAMOutput = {
-            "low_res_multimasks": low_res_masks,
-            "high_res_multimasks": high_res_masks,
-            "ious": ious,
-            "low_res_masks": low_res_masks,
-            "high_res_masks": high_res_masks,
+            'low_res_multimasks': low_res_masks,
+            'high_res_multimasks': high_res_masks,
+            'ious': ious,
+            'low_res_masks': low_res_masks,
+            'high_res_masks': high_res_masks,
             # pyre-fixme[61]: `object_score_logits` is undefined, or not always defined.
-            "object_score_logits": object_score_logits,
+            'object_score_logits': object_score_logits,
         }
         if self.use_obj_ptrs_in_encoder:
             # pyre-fixme[61]: `obj_ptr` is undefined, or not always defined.
-            outputs["obj_ptr"] = obj_ptr  # [num_objects, C], in data space
+            outputs['obj_ptr'] = obj_ptr  # [num_objects, C], in data space
         return outputs
 
     def forward(self, input: BatchedDatapoint, is_inference=False):
         if self.training or not self.forward_backbone_per_frame_for_eval:
             # precompute image features on all frames before tracking
-            backbone_out = self.forward_image(
-                input.img_batch, need_interactive_out=True, need_propagation_out=True
-            )
+            backbone_out = self.forward_image(input.img_batch, need_interactive_out=True, need_propagation_out=True)
         else:
             # defer image feature computation on a frame until it's being tracked
             backbone_out = {}
@@ -1056,7 +972,7 @@ class VideoTrackingMultiplex(nn.Module):
                 need_sam3_out=need_sam3_out,
                 need_sam2_out=need_propagation_out,
             )
-            backbone_out["interactive"] = backbone_out["sam2_backbone_out"]
+            backbone_out['interactive'] = backbone_out['sam2_backbone_out']
         else:
             # pyre-fixme[29]: `Union[Module, Tensor]` is not a function.
             backbone_out = self.backbone.forward_image(
@@ -1069,35 +985,27 @@ class VideoTrackingMultiplex(nn.Module):
             # precompute projected level 0 and level 1 features in SAM decoder
             # to avoid running it again on every SAM click
             if need_interactive_out:
-                backbone_out["interactive"]["backbone_fpn"][
-                    0
-                ].tensors = self.interactive_sam_mask_decoder.conv_s0(
-                    backbone_out["interactive"]["backbone_fpn"][0].tensors
+                backbone_out['interactive']['backbone_fpn'][0].tensors = self.interactive_sam_mask_decoder.conv_s0(
+                    backbone_out['interactive']['backbone_fpn'][0].tensors
                 )
-                backbone_out["interactive"]["backbone_fpn"][
-                    1
-                ].tensors = self.interactive_sam_mask_decoder.conv_s1(
-                    backbone_out["interactive"]["backbone_fpn"][1].tensors
+                backbone_out['interactive']['backbone_fpn'][1].tensors = self.interactive_sam_mask_decoder.conv_s1(
+                    backbone_out['interactive']['backbone_fpn'][1].tensors
                 )
             if need_propagation_out:
-                backbone_out["sam2_backbone_out"]["backbone_fpn"][
-                    0
-                ].tensors = self.sam_mask_decoder.conv_s0(
-                    backbone_out["sam2_backbone_out"]["backbone_fpn"][0].tensors
+                backbone_out['sam2_backbone_out']['backbone_fpn'][0].tensors = self.sam_mask_decoder.conv_s0(
+                    backbone_out['sam2_backbone_out']['backbone_fpn'][0].tensors
                 )
-                backbone_out["sam2_backbone_out"]["backbone_fpn"][
-                    1
-                ].tensors = self.sam_mask_decoder.conv_s1(
-                    backbone_out["sam2_backbone_out"]["backbone_fpn"][1].tensors
+                backbone_out['sam2_backbone_out']['backbone_fpn'][1].tensors = self.sam_mask_decoder.conv_s1(
+                    backbone_out['sam2_backbone_out']['backbone_fpn'][1].tensors
                 )
         # Clone to help torch.compile
         for out_type in backbone_out.keys():
-            for i in range(len(backbone_out[out_type]["backbone_fpn"])):
-                backbone_out[out_type]["backbone_fpn"][i].tensors = self._maybe_clone(
-                    backbone_out[out_type]["backbone_fpn"][i].tensors
+            for i in range(len(backbone_out[out_type]['backbone_fpn'])):
+                backbone_out[out_type]['backbone_fpn'][i].tensors = self._maybe_clone(
+                    backbone_out[out_type]['backbone_fpn'][i].tensors
                 )
-                backbone_out[out_type]["vision_pos_enc"][i] = self._maybe_clone(
-                    backbone_out[out_type]["vision_pos_enc"][i]
+                backbone_out[out_type]['vision_pos_enc'][i] = self._maybe_clone(
+                    backbone_out[out_type]['vision_pos_enc'][i]
                 )
         return backbone_out
 
@@ -1108,9 +1016,9 @@ class VideoTrackingMultiplex(nn.Module):
             stage_id: targets.segments.unsqueeze(1)  # [B, 1, H_im, W_im]
             for stage_id, targets in enumerate(input.find_targets)
         }
-        backbone_out["gt_masks_per_frame"] = gt_masks_per_frame
+        backbone_out['gt_masks_per_frame'] = gt_masks_per_frame
         num_frames = len(input.find_targets)
-        backbone_out["num_frames"] = num_frames
+        backbone_out['num_frames'] = num_frames
 
         # Randomly decide whether to use point inputs or mask inputs
         if self.training:
@@ -1136,20 +1044,12 @@ class VideoTrackingMultiplex(nn.Module):
         use_pt_input = self.rng.random() < prob_to_use_pt_input
         if rand_init_cond_frames and num_init_cond_frames > 1:
             # randomly select 1 to `num_init_cond_frames` frames as initial conditioning frames
-            num_init_cond_frames = self.rng.integers(
-                1, num_init_cond_frames, endpoint=True
-            )
-        if (
-            use_pt_input
-            and rand_frames_to_correct
-            and num_frames_to_correct > num_init_cond_frames
-        ):
+            num_init_cond_frames = self.rng.integers(1, num_init_cond_frames, endpoint=True)
+        if use_pt_input and rand_frames_to_correct and num_frames_to_correct > num_init_cond_frames:
             # randomly select `num_init_cond_frames` to `num_frames_to_correct` frames to sample
             # correction clicks (only for the case of point input)
-            num_frames_to_correct = self.rng.integers(
-                num_init_cond_frames, num_frames_to_correct, endpoint=True
-            )
-        backbone_out["use_pt_input"] = use_pt_input
+            num_frames_to_correct = self.rng.integers(num_init_cond_frames, num_frames_to_correct, endpoint=True)
+        backbone_out['use_pt_input'] = use_pt_input
 
         # Sample initial conditioning frames
         if num_init_cond_frames == 1:
@@ -1161,8 +1061,8 @@ class VideoTrackingMultiplex(nn.Module):
                 num_init_cond_frames - 1,
                 replace=False,
             ).tolist()
-        backbone_out["init_cond_frames"] = init_cond_frames
-        backbone_out["frames_not_in_init_cond"] = [
+        backbone_out['init_cond_frames'] = init_cond_frames
+        backbone_out['frames_not_in_init_cond'] = [
             t for t in range(start_frame_idx, num_frames) if t not in init_cond_frames
         ]
 
@@ -1179,18 +1079,16 @@ class VideoTrackingMultiplex(nn.Module):
             extra_num = num_frames_to_correct - num_init_cond_frames
             frames_to_add_correction_pt = (
                 init_cond_frames
-                + self.rng.choice(
-                    backbone_out["frames_not_in_init_cond"], extra_num, replace=False
-                ).tolist()
+                + self.rng.choice(backbone_out['frames_not_in_init_cond'], extra_num, replace=False).tolist()
             )
-        backbone_out["frames_to_add_correction_pt"] = frames_to_add_correction_pt
+        backbone_out['frames_to_add_correction_pt'] = frames_to_add_correction_pt
 
         return backbone_out
 
     def _prepare_conditional_frames(self, backbone_out):
-        init_cond_frames = backbone_out["init_cond_frames"]
-        gt_masks_per_frame = backbone_out["gt_masks_per_frame"]
-        use_pt_input = backbone_out["use_pt_input"]
+        init_cond_frames = backbone_out['init_cond_frames']
+        gt_masks_per_frame = backbone_out['gt_masks_per_frame']
+        use_pt_input = backbone_out['use_pt_input']
 
         if self.training:
             prob_to_use_box_input = self.prob_to_use_box_input_for_train
@@ -1198,11 +1096,11 @@ class VideoTrackingMultiplex(nn.Module):
             prob_to_use_box_input = self.prob_to_use_box_input_for_eval
 
         # Prepare mask or point inputs on initial conditioning frames
-        backbone_out["mask_inputs_per_frame"] = {}  # {frame_idx: <input_masks>}
-        backbone_out["point_inputs_per_frame"] = {}  # {frame_idx: <input_points>}
+        backbone_out['mask_inputs_per_frame'] = {}  # {frame_idx: <input_masks>}
+        backbone_out['point_inputs_per_frame'] = {}  # {frame_idx: <input_points>}
         for t in init_cond_frames:
             if not use_pt_input:
-                backbone_out["mask_inputs_per_frame"][t] = gt_masks_per_frame[t]
+                backbone_out['mask_inputs_per_frame'][t] = gt_masks_per_frame[t]
             else:
                 # During training # P(box) = prob_to_use_pt_input * prob_to_use_box_input
                 use_box_input = self.rng.random() < prob_to_use_box_input
@@ -1216,13 +1114,11 @@ class VideoTrackingMultiplex(nn.Module):
                     points, labels = get_next_point(
                         gt_masks=gt_masks_per_frame[t],
                         pred_masks=None,
-                        method=(
-                            "uniform" if self.training else self.pt_sampling_for_eval
-                        ),
+                        method=('uniform' if self.training else self.pt_sampling_for_eval),
                     )
 
-                point_inputs = {"point_coords": points, "point_labels": labels}
-                backbone_out["point_inputs_per_frame"][t] = point_inputs
+                point_inputs = {'point_coords': points, 'point_labels': labels}
+                backbone_out['point_inputs_per_frame'][t] = point_inputs
 
         return backbone_out
 
@@ -1231,9 +1127,7 @@ class VideoTrackingMultiplex(nn.Module):
         Prepare input mask, point or box prompts. Optionally, we allow tracking from
         a custom `start_frame_idx` to the end of the video (for evaluation purposes).
         """
-        backbone_out = self._prepare_prompt_inputs_meta(
-            backbone_out, input, start_frame_idx
-        )
+        backbone_out = self._prepare_prompt_inputs_meta(backbone_out, input, start_frame_idx)
         backbone_out = self._prepare_conditional_frames(backbone_out)
         return backbone_out
 
@@ -1246,18 +1140,16 @@ class VideoTrackingMultiplex(nn.Module):
             if neck_k not in backbone_out:
                 continue
             neck_out = backbone_out[neck_k]
-            assert len(neck_out["backbone_fpn"]) == len(neck_out["vision_pos_enc"])
-            assert len(neck_out["backbone_fpn"]) >= self.num_feature_levels
+            assert len(neck_out['backbone_fpn']) == len(neck_out['vision_pos_enc'])
+            assert len(neck_out['backbone_fpn']) >= self.num_feature_levels
 
-            feature_maps = neck_out["backbone_fpn"][-self.num_feature_levels :]
-            vision_pos_embeds = neck_out["vision_pos_enc"][-self.num_feature_levels :]
+            feature_maps = neck_out['backbone_fpn'][-self.num_feature_levels :]
+            vision_pos_embeds = neck_out['vision_pos_enc'][-self.num_feature_levels :]
 
             feat_sizes = [(x.shape[-2], x.shape[-1]) for x in vision_pos_embeds]
             # flatten NxCxHxW to HWxNxC
             vision_feats = [x.tensors.flatten(2).permute(2, 0, 1) for x in feature_maps]
-            vision_pos_embeds = [
-                x.flatten(2).permute(2, 0, 1) for x in vision_pos_embeds
-            ]
+            vision_pos_embeds = [x.flatten(2).permute(2, 0, 1) for x in vision_pos_embeds]
             vision_masks = [x.mask for x in feature_maps]
 
             for i, vision_mask in enumerate(vision_masks):
@@ -1265,10 +1157,10 @@ class VideoTrackingMultiplex(nn.Module):
                     vision_masks[i] = vision_mask.flatten(1)
 
             backbone_features[neck_k] = {
-                "vision_feats": vision_feats,
-                "vision_pos_embeds": vision_pos_embeds,
-                "vision_masks": vision_masks,
-                "feat_sizes": feat_sizes,
+                'vision_feats': vision_feats,
+                'vision_pos_embeds': vision_pos_embeds,
+                'vision_masks': vision_masks,
+                'feat_sizes': feat_sizes,
             }
 
         return backbone_features
@@ -1288,9 +1180,7 @@ class VideoTrackingMultiplex(nn.Module):
 
         # Compute the image features on those unique image ids
         image = img_batch.tensors[unique_img_ids]
-        image_mask = (
-            img_batch.mask[unique_img_ids] if img_batch.mask is not None else None
-        )
+        image_mask = img_batch.mask[unique_img_ids] if img_batch.mask is not None else None
 
         backbone_out = self.forward_image(
             NestedTensor(tensors=image, mask=image_mask),
@@ -1320,11 +1210,7 @@ class VideoTrackingMultiplex(nn.Module):
         B = multiplex_state.num_buckets
         # B = current_vision_feats[-1].size(1)  # batch size on this frame
         vision_feat = current_vision_feats[-1].expand(-1, B, -1)
-        vision_mask = (
-            current_vision_masks[-1].expand(-1, B, -1)
-            if current_vision_masks[-1] is not None
-            else None
-        )
+        vision_mask = current_vision_masks[-1].expand(-1, B, -1) if current_vision_masks[-1] is not None else None
         vision_pos_embed = current_vision_pos_embeds[-1].expand(-1, B, -1)
 
         C = self.hidden_dim
@@ -1347,9 +1233,9 @@ class VideoTrackingMultiplex(nn.Module):
                 to_cat_image_feat, to_cat_image_pos_embed = [], []
             # Add conditioning frames's output first (all cond frames have t_pos=0 for
             # when getting temporal positional embedding below)
-            assert len(output_dict["cond_frame_outputs"]) > 0
+            assert len(output_dict['cond_frame_outputs']) > 0
             # Select a maximum number of temporally closest cond frames for cross attention
-            cond_outputs = output_dict["cond_frame_outputs"]
+            cond_outputs = output_dict['cond_frame_outputs']
             selected_cond_outputs, unselected_cond_outputs = select_closest_cond_frames(
                 frame_idx,
                 cond_outputs,
@@ -1357,10 +1243,7 @@ class VideoTrackingMultiplex(nn.Module):
                 keep_first_cond_frame=self.keep_first_cond_frame,
             )
 
-            t_pos_and_prevs = [
-                ((frame_idx - t) * tpos_sign_mul, out, True)
-                for t, out in selected_cond_outputs.items()
-            ]
+            t_pos_and_prevs = [((frame_idx - t) * tpos_sign_mul, out, True) for t, out in selected_cond_outputs.items()]
             # Add last (self.num_maskmem - 1) frames before current frame for non-conditioning memory
             # the earliest one has t_pos=1 and the latest one has t_pos=self.num_maskmem-1
             # We also allow taking the memory frame non-consecutively (with r>1), in which case
@@ -1368,9 +1251,7 @@ class VideoTrackingMultiplex(nn.Module):
             r = 1 if self.training else self.memory_temporal_stride_for_eval
 
             if self.use_memory_selection:
-                valid_indices = self.frame_filter(
-                    output_dict, track_in_reverse, frame_idx, num_frames, r
-                )
+                valid_indices = self.frame_filter(output_dict, track_in_reverse, frame_idx, num_frames, r)
 
             for t_pos in range(1, self.num_maskmem):
                 t_rel = self.num_maskmem - t_pos  # how many frames before current frame
@@ -1405,7 +1286,7 @@ class VideoTrackingMultiplex(nn.Module):
                             prev_frame_idx = -(-(frame_idx + 2) // r) * r
                             # then seek further among every r-th frames
                             prev_frame_idx = prev_frame_idx + (t_rel - 2) * r
-                out = output_dict["non_cond_frame_outputs"].get(prev_frame_idx, None)
+                out = output_dict['non_cond_frame_outputs'].get(prev_frame_idx, None)
                 if out is None:
                     # If an unselected conditioning frame is among the last (self.num_maskmem - 1)
                     # frames, we still attend to it as if it's a non-conditioning frame.
@@ -1416,7 +1297,7 @@ class VideoTrackingMultiplex(nn.Module):
                 if prev is None:
                     continue  # skip padding frames
 
-                feats = prev.get("maskmem_features")
+                feats = prev.get('maskmem_features')
                 if feats is None:
                     continue
                 # "maskmem_features" might have been offloaded to CPU in demo use cases,
@@ -1424,9 +1305,7 @@ class VideoTrackingMultiplex(nn.Module):
                 feats = feats.cuda(non_blocking=True)
                 if feats.dim() == 5:
                     feats = multiplex_state.demux(feats).contiguous()
-                    prev["maskmem_features"] = (
-                        feats.cpu() if not feats.is_cuda else feats
-                    )
+                    prev['maskmem_features'] = feats.cpu() if not feats.is_cuda else feats
 
                 if feats.shape[0] == 0:
                     continue
@@ -1434,7 +1313,7 @@ class VideoTrackingMultiplex(nn.Module):
                 to_cat_prompt.append(feats.flatten(2).permute(2, 0, 1))
                 # to_cat_prompt_mask.append(None)
                 # Spatial positional encoding (it might have been offloaded to CPU in eval)
-                maskmem_pos_list = prev.get("maskmem_pos_enc")
+                maskmem_pos_list = prev.get('maskmem_pos_enc')
                 if not maskmem_pos_list:
                     continue
                 maskmem_enc = maskmem_pos_list[-1]
@@ -1443,9 +1322,7 @@ class VideoTrackingMultiplex(nn.Module):
                 maskmem_enc = maskmem_enc.cuda(non_blocking=True)
                 if maskmem_enc.dim() == 5:
                     maskmem_enc = multiplex_state.demux(maskmem_enc).contiguous()
-                    prev["maskmem_pos_enc"][-1] = (
-                        maskmem_enc.cpu() if not maskmem_enc.is_cuda else maskmem_enc
-                    )
+                    prev['maskmem_pos_enc'][-1] = maskmem_enc.cpu() if not maskmem_enc.is_cuda else maskmem_enc
                 maskmem_enc = maskmem_enc.flatten(2).permute(2, 0, 1)
 
                 if self.use_maskmem_tpos_v2:
@@ -1465,8 +1342,8 @@ class VideoTrackingMultiplex(nn.Module):
 
                 if self.save_image_features:
                     # image features are in (HW)BC
-                    image_feat = prev["image_features"].cuda()
-                    image_pos_embed = prev["image_pos_enc"].cuda() + tpos_enc
+                    image_feat = prev['image_features'].cuda()
+                    image_pos_embed = prev['image_pos_enc'].cuda() + tpos_enc
                     # pyrefly: ignore [unbound-name]
                     to_cat_image_feat.append(image_feat)
                     # pyrefly: ignore [unbound-name]
@@ -1504,11 +1381,7 @@ class VideoTrackingMultiplex(nn.Module):
                 # Add up to (max_obj_ptrs_in_encoder - 1) non-conditioning frames before current frame
                 for t_diff in range(1, max_obj_ptrs_in_encoder):
                     if not self.use_memory_selection:
-                        t = (
-                            frame_idx + t_diff
-                            if track_in_reverse
-                            else frame_idx - t_diff
-                        )
+                        t = frame_idx + t_diff if track_in_reverse else frame_idx - t_diff
                         if t < 0 or (num_frames is not None and t >= num_frames):
                             break
                     else:
@@ -1520,36 +1393,26 @@ class VideoTrackingMultiplex(nn.Module):
                         #  always defined.
                         t = valid_indices[-t_diff]
 
-                    out = output_dict["non_cond_frame_outputs"].get(
-                        t, unselected_cond_outputs.get(t, None)
-                    )
+                    out = output_dict['non_cond_frame_outputs'].get(t, unselected_cond_outputs.get(t, None))
                     if out is not None:
                         pos_and_outs_for_ptr.append((t_diff, out, False))
 
                 # If we have at least one object pointer, add them to the across attention
                 if len(pos_and_outs_for_ptr) > 0:
-                    pos_list, out_list, is_selected_cond_frame_list = zip(
-                        *pos_and_outs_for_ptr
-                    )
+                    pos_list, out_list, is_selected_cond_frame_list = zip(*pos_and_outs_for_ptr)
                     # Filter out outputs that don't have obj_ptr (e.g., when object has empty mask)
                     filtered_data = [
                         (pos, out, is_cond)
-                        for pos, out, is_cond in zip(
-                            pos_list, out_list, is_selected_cond_frame_list
-                        )
-                        if "obj_ptr" in out
+                        for pos, out, is_cond in zip(pos_list, out_list, is_selected_cond_frame_list)
+                        if 'obj_ptr' in out
                     ]
 
                     # Only proceed if we have at least one valid obj_ptr
                     if len(filtered_data) > 0:
-                        pos_list, out_list, is_selected_cond_frame_list = zip(
-                            *filtered_data
-                        )
+                        pos_list, out_list, is_selected_cond_frame_list = zip(*filtered_data)
                         # each out["obj_ptr"] is a tensor of shape (num_buckets, seq_len, C)
                         # cat object pointers along dim=0 into [ptr_seq_len, B, C] shape
-                        obj_ptrs = torch.cat(
-                            [out["obj_ptr"] for out in out_list], dim=1
-                        ).transpose(0, 1)
+                        obj_ptrs = torch.cat([out['obj_ptr'] for out in out_list], dim=1).transpose(0, 1)
 
                         # a temporal positional embedding based on how far each object pointer is from
                         # the current frame (sine embedding normalized by the max pointer num).
@@ -1560,20 +1423,14 @@ class VideoTrackingMultiplex(nn.Module):
                                 device=device,
                             )
                         else:
-                            obj_pos = self._get_tpos_enc(
-                                pos_list, device=device, dummy=True
-                            )
+                            obj_pos = self._get_tpos_enc(pos_list, device=device, dummy=True)
                         # expand to batch size
                         obj_pos = obj_pos.unsqueeze(1).expand(-1, B, -1)
 
-                        assert self.mem_dim == C, (
-                            f"obj_ptrs.shape = {obj_ptrs.shape}, C = {C}"
-                        )
+                        assert self.mem_dim == C, f'obj_ptrs.shape = {obj_ptrs.shape}, C = {C}'
 
                         # each frame has [bucket_size] pointers, except the first frame
-                        obj_pos = obj_pos.repeat_interleave(
-                            multiplex_state.multiplex_count, dim=0
-                        )
+                        obj_pos = obj_pos.repeat_interleave(multiplex_state.multiplex_count, dim=0)
 
                         to_cat_prompt.append(obj_ptrs)
                         to_cat_prompt_pos_embed.append(obj_pos)
@@ -1586,9 +1443,7 @@ class VideoTrackingMultiplex(nn.Module):
                     num_obj_ptr_tokens = 0
         else:
             # for initial conditioning frames, encode them without using any previous memory
-            raise NotImplementedError(
-                "Any init cond frame should have gone to _use_mask_as_output instead"
-            )
+            raise NotImplementedError('Any init cond frame should have gone to _use_mask_as_output instead')
 
         # Step 2: Concatenate the memories and forward through the transformer encoder
         if len(to_cat_prompt) == 0:
@@ -1643,7 +1498,7 @@ class VideoTrackingMultiplex(nn.Module):
                 num_obj_ptr_tokens=num_obj_ptr_tokens,
             )
         # reshape the output (HW)BC => BCHW
-        pix_feat_with_mem = encoder_out["memory"].permute(1, 2, 0).view(B, C, H, W)
+        pix_feat_with_mem = encoder_out['memory'].permute(1, 2, 0).view(B, C, H, W)
         return pix_feat_with_mem
 
     def _encode_new_memory(
@@ -1668,9 +1523,7 @@ class VideoTrackingMultiplex(nn.Module):
             # optionally, apply non-overlapping constraints to the masks (it's applied
             # in the batch dimension and should only be used during eval, where all
             # the objects come from the same video under batch size 1).
-            pred_masks_high_res = self._apply_non_overlapping_constraints(
-                pred_masks_high_res
-            )
+            pred_masks_high_res = self._apply_non_overlapping_constraints(pred_masks_high_res)
         if self.apply_sigmoid_to_mask_logits_for_mem_enc:
             # scale the raw mask logits with a temperature before applying sigmoid
             assert not self.binarize_mask_from_pts_for_mem_enc, (
@@ -1694,15 +1547,11 @@ class VideoTrackingMultiplex(nn.Module):
             # figure out the set of objects that are "conditional" on this frame
             if conditioning_objects is None:
                 conditioning_objects = []
-                unconditioning_objects = sorted(
-                    list(multiplex_state.get_all_valid_object_idx())
-                )
+                unconditioning_objects = sorted(list(multiplex_state.get_all_valid_object_idx()))
             else:
                 conditioning_objects = sorted(list(conditioning_objects))
                 all_objects_idx = multiplex_state.get_all_valid_object_idx()
-                unconditioning_objects = sorted(
-                    [i for i in all_objects_idx if i not in conditioning_objects]
-                )
+                unconditioning_objects = sorted([i for i in all_objects_idx if i not in conditioning_objects])
 
         mux_mask_for_mem = multiplex_state.mux(mask_for_mem).squeeze(2)
 
@@ -1737,54 +1586,40 @@ class VideoTrackingMultiplex(nn.Module):
         else:
             maskmem_out = self.maskmem_backbone(image, pix_feat, mux_mask_for_mem)
         # Clone the feats and pos_enc to enable compilation
-        maskmem_features = self._maybe_clone(maskmem_out["vision_features"])
-        maskmem_pos_enc = [self._maybe_clone(m) for m in maskmem_out["vision_pos_enc"]]
+        maskmem_features = self._maybe_clone(maskmem_out['vision_features'])
+        maskmem_pos_enc = [self._maybe_clone(m) for m in maskmem_out['vision_pos_enc']]
 
         if self.no_obj_embed_spatial is not None:
             # since maskmem_features are deeply detangled between objects
             # we simply add a projected embedding for each empty object
             # num_buckets * multiplex_count * C
-            no_obj_embed_spatial = self.no_obj_embed_spatial.unsqueeze(0).repeat(
-                multiplex_state.num_buckets, 1, 1
-            )
+            no_obj_embed_spatial = self.no_obj_embed_spatial.unsqueeze(0).repeat(multiplex_state.num_buckets, 1, 1)
             # Align object_score_logits length to multiplex expectations before mux
             if object_score_logits is not None:
                 obj_expected = multiplex_state.total_valid_entries
                 obj_current = object_score_logits.shape[0]
                 if obj_current != obj_expected:
                     if obj_current < obj_expected:
-                        pad_shape = (obj_expected - obj_current,) + tuple(
-                            object_score_logits.shape[1:]
-                        )
+                        pad_shape = (obj_expected - obj_current,) + tuple(object_score_logits.shape[1:])
                         obj_pad = object_score_logits.new_zeros(pad_shape)
-                        object_score_logits = torch.cat(
-                            [object_score_logits, obj_pad], dim=0
-                        )
+                        object_score_logits = torch.cat([object_score_logits, obj_pad], dim=0)
                     else:
                         object_score_logits = object_score_logits[:obj_expected]
             object_score_logits = multiplex_state.mux(object_score_logits)
-            is_obj_appearing = (
-                object_score_logits > self.object_score_logit_threshold
-            ).float()
+            is_obj_appearing = (object_score_logits > self.object_score_logit_threshold).float()
 
             no_obj_embed = ((1 - is_obj_appearing) * no_obj_embed_spatial).sum(dim=1)
-            maskmem_features += no_obj_embed[..., None, None].expand_as(
-                maskmem_features
-            )
+            maskmem_features += no_obj_embed[..., None, None].expand_as(maskmem_features)
 
         if self.add_object_conditional_embeddings:
             # add object conditional embeddings to the maskmem_features
             # num_buckets * multiplex_count * C
-            obj_cond_embed = self.obj_cond_embed.unsqueeze(0).repeat(
-                multiplex_state.num_buckets, 1, 1
-            )
+            obj_cond_embed = self.obj_cond_embed.unsqueeze(0).repeat(multiplex_state.num_buckets, 1, 1)
             obj_cond_embed = multiplex_state.demux(obj_cond_embed)
             obj_merged_embed = obj_cond_embed
 
             if self.add_object_unconditional_embeddings:
-                obj_non_cond_embed = self.obj_non_cond_embed.unsqueeze(0).repeat(
-                    multiplex_state.num_buckets, 1, 1
-                )
+                obj_non_cond_embed = self.obj_non_cond_embed.unsqueeze(0).repeat(multiplex_state.num_buckets, 1, 1)
                 obj_non_cond_embed = multiplex_state.demux(obj_non_cond_embed)
                 if self.training:
                     obj_merged_embed = obj_merged_embed.clone()
@@ -1797,9 +1632,7 @@ class VideoTrackingMultiplex(nn.Module):
                 ]
 
             obj_merged_embed = multiplex_state.mux(obj_merged_embed).sum(dim=1)
-            maskmem_features = maskmem_features + obj_merged_embed[
-                ..., None, None
-            ].expand_as(maskmem_features)
+            maskmem_features = maskmem_features + obj_merged_embed[..., None, None].expand_as(maskmem_features)
 
         if maskmem_features.dim() == 5:
             maskmem_features = multiplex_state.demux(maskmem_features).contiguous()
@@ -1822,9 +1655,7 @@ class VideoTrackingMultiplex(nn.Module):
         objects_to_interact: Optional[list[int]] = None,
     ):
         """Forward video tracking on each frame (and sample correction clicks)."""
-        img_feats_already_computed = (
-            "interactive" in backbone_out or "sam2_backbone_out" in backbone_out
-        )
+        img_feats_already_computed = 'interactive' in backbone_out or 'sam2_backbone_out' in backbone_out
         if img_feats_already_computed:
             # Prepare the backbone features
             # - vision_feats and vision_pos_embeds are in (HW)BC format
@@ -1832,23 +1663,23 @@ class VideoTrackingMultiplex(nn.Module):
             backbone_features = self._prepare_backbone_features(backbone_out)
 
         # Starting the stage loop
-        num_frames = backbone_out["num_frames"]
-        init_cond_frames = backbone_out["init_cond_frames"]
-        frames_to_add_correction_pt = backbone_out["frames_to_add_correction_pt"]
+        num_frames = backbone_out['num_frames']
+        init_cond_frames = backbone_out['init_cond_frames']
+        frames_to_add_correction_pt = backbone_out['frames_to_add_correction_pt']
         # first process all the initial conditioning frames to encode them as memory,
         # and then conditioning on them to track the remaining frames
-        processing_order = init_cond_frames + backbone_out["frames_not_in_init_cond"]
+        processing_order = init_cond_frames + backbone_out['frames_not_in_init_cond']
 
         cond_frame_outputs: dict[int, StageOutput] = {}
         non_cond_frame_outputs: dict[int, StageOutput] = {}
         output_dict = {
-            "cond_frame_outputs": cond_frame_outputs,
-            "non_cond_frame_outputs": non_cond_frame_outputs,
+            'cond_frame_outputs': cond_frame_outputs,
+            'non_cond_frame_outputs': non_cond_frame_outputs,
         }
 
         multiplex_state = self.multiplex_controller.get_state(
-            backbone_out["gt_masks_per_frame"][0].shape[0],
-            device=backbone_out["gt_masks_per_frame"][0].device,
+            backbone_out['gt_masks_per_frame'][0].shape[0],
+            device=backbone_out['gt_masks_per_frame'][0].device,
             dtype=torch.float,
             random=self.training,
         )
@@ -1857,13 +1688,9 @@ class VideoTrackingMultiplex(nn.Module):
             # Get the image features for the current frames
             img_ids = input.find_inputs[stage_id].img_ids
             # the image ids are for the entire batch
-            assert all(
-                [img_id == img_ids[0] for img_id in img_ids]
-            )  # should be all the same
+            assert all([img_id == img_ids[0] for img_id in img_ids])  # should be all the same
             # force this to have a batch size of 1
-            img_ids = torch.tensor(
-                [img_ids[0]], device=img_ids.device, dtype=img_ids.dtype
-            )
+            img_ids = torch.tensor([img_ids[0]], device=img_ids.device, dtype=img_ids.dtype)
 
             if img_feats_already_computed:
                 # Retrieve image features according to img_ids (if they are already computed).
@@ -1872,47 +1699,32 @@ class VideoTrackingMultiplex(nn.Module):
                 # pyrefly: ignore [unbound-name]
                 for neck_k, neck_out in backbone_features.items():
                     current_backbone_features[neck_k] = {
-                        "vision_feats": [
-                            x[:, img_ids] for x in neck_out["vision_feats"]
-                        ],
-                        "vision_masks": [
-                            x[img_ids] if x is not None else None
-                            for x in neck_out["vision_masks"]
-                        ],
-                        "vision_pos_embeds": [
-                            x[:, img_ids] for x in neck_out["vision_pos_embeds"]
-                        ],
-                        "feat_sizes": neck_out["feat_sizes"],
+                        'vision_feats': [x[:, img_ids] for x in neck_out['vision_feats']],
+                        'vision_masks': [x[img_ids] if x is not None else None for x in neck_out['vision_masks']],
+                        'vision_pos_embeds': [x[:, img_ids] for x in neck_out['vision_pos_embeds']],
+                        'feat_sizes': neck_out['feat_sizes'],
                     }
             else:
                 # Otherwise, compute the image features on the fly for the given img_ids
                 # (this might be used for evaluation on long videos to avoid backbone OOM).
-                need_interactive_out = (stage_id in frames_to_add_correction_pt) or (
-                    stage_id in init_cond_frames
-                )
-                (current_image, current_backbone_features) = (
-                    self._prepare_backbone_features_per_frame(
-                        input.img_batch,
-                        img_ids,
-                        need_interactive_out=need_interactive_out,
-                        need_propagation_out=True,
-                    )
+                need_interactive_out = (stage_id in frames_to_add_correction_pt) or (stage_id in init_cond_frames)
+                (current_image, current_backbone_features) = self._prepare_backbone_features_per_frame(
+                    input.img_batch,
+                    img_ids,
+                    need_interactive_out=need_interactive_out,
+                    need_propagation_out=True,
                 )
 
             # Get output masks based on this frame's prompts and previous memory
             current_out = self.track_step(
                 frame_idx=stage_id,
                 is_init_cond_frame=stage_id in init_cond_frames,
-                backbone_features_interactive=current_backbone_features.get(
-                    "interactive"
-                ),
-                backbone_features_propagation=current_backbone_features.get(
-                    "sam2_backbone_out"
-                ),
+                backbone_features_interactive=current_backbone_features.get('interactive'),
+                backbone_features_propagation=current_backbone_features.get('sam2_backbone_out'),
                 image=current_image,
-                point_inputs=backbone_out["point_inputs_per_frame"].get(stage_id, None),
-                mask_inputs=backbone_out["mask_inputs_per_frame"].get(stage_id, None),
-                gt_masks=backbone_out["gt_masks_per_frame"].get(stage_id, None),
+                point_inputs=backbone_out['point_inputs_per_frame'].get(stage_id, None),
+                mask_inputs=backbone_out['mask_inputs_per_frame'].get(stage_id, None),
+                gt_masks=backbone_out['gt_masks_per_frame'].get(stage_id, None),
                 frames_to_add_correction_pt=frames_to_add_correction_pt,
                 output_dict=output_dict,
                 num_frames=num_frames,
@@ -1921,29 +1733,26 @@ class VideoTrackingMultiplex(nn.Module):
             )
             # Append the output, depending on whether it's a conditioning frame
             add_output_as_cond_frame = stage_id in init_cond_frames or (
-                self.add_all_frames_to_correct_as_cond
-                and stage_id in frames_to_add_correction_pt
+                self.add_all_frames_to_correct_as_cond and stage_id in frames_to_add_correction_pt
             )
             if add_output_as_cond_frame:
-                output_dict["cond_frame_outputs"][stage_id] = current_out
+                output_dict['cond_frame_outputs'][stage_id] = current_out
             else:
-                output_dict["non_cond_frame_outputs"][stage_id] = current_out
+                output_dict['non_cond_frame_outputs'][stage_id] = current_out
 
         # pyre-fixme[6]: For 2nd argument expected `Dict[int, StageOutput]` but got
         #  `MultiplexState`.
-        output_dict["multiplex_state"] = multiplex_state
+        output_dict['multiplex_state'] = multiplex_state
 
         if return_dict:
             return output_dict
         # turn `output_dict` into a list for loss function
         all_frame_outputs = {}
-        all_frame_outputs.update(output_dict["cond_frame_outputs"])
-        all_frame_outputs.update(output_dict["non_cond_frame_outputs"])
+        all_frame_outputs.update(output_dict['cond_frame_outputs'])
+        all_frame_outputs.update(output_dict['non_cond_frame_outputs'])
         all_frame_outputs = [all_frame_outputs[t] for t in range(num_frames)]
         # Make DDP happy with activation checkpointing by removing unused keys
-        all_frame_outputs = [
-            {k: v for k, v in d.items() if k != "obj_ptr"} for d in all_frame_outputs
-        ]
+        all_frame_outputs = [{k: v for k, v in d.items() if k != 'obj_ptr'} for d in all_frame_outputs]
 
         return all_frame_outputs
 
@@ -1992,85 +1801,79 @@ class VideoTrackingMultiplex(nn.Module):
            with the masks from the interaction output.
         """
         current_out: StageOutput = {
-            "conditioning_objects": set(),
-            "point_inputs": point_inputs,
-            "mask_inputs": mask_inputs,
+            'conditioning_objects': set(),
+            'point_inputs': point_inputs,
+            'mask_inputs': mask_inputs,
         }
 
         mode = None
         if mask_inputs is not None:
-            mode = "mask_as_output"
+            mode = 'mask_as_output'
         elif point_inputs is None:
-            mode = "propagation_only"
+            mode = 'propagation_only'
         elif point_inputs is not None:
             # Case 3a: Refining existing predictions
             if prev_sam_mask_logits is not None:
                 assert objects_to_interact is not None, (
-                    "objects_to_interact must be specified when refining with prev_sam_mask_logits"
+                    'objects_to_interact must be specified when refining with prev_sam_mask_logits'
                 )
-                mode = "interaction_only"
+                mode = 'interaction_only'
             # Case 3b: Initial conditioning frame
             elif is_init_cond_frame:
-                mode = "interaction_only"
+                mode = 'interaction_only'
             # Case 4: Propagation then interaction
             elif objects_to_interact is not None and prev_sam_mask_logits is None:
                 assert not self.training
-                mode = "propagation_and_interaction"
+                mode = 'propagation_and_interaction'
 
         if mode is None:
             raise ValueError(
-                f"Unable to determine tracking case. "
-                f"mask_inputs={mask_inputs is not None}, "
-                f"point_inputs={point_inputs is not None}, "
-                f"prev_sam_mask_logits={prev_sam_mask_logits is not None}, "
-                f"objects_to_interact={objects_to_interact}, "
-                f"is_init_cond_frame={is_init_cond_frame}"
+                f'Unable to determine tracking case. '
+                f'mask_inputs={mask_inputs is not None}, '
+                f'point_inputs={point_inputs is not None}, '
+                f'prev_sam_mask_logits={prev_sam_mask_logits is not None}, '
+                f'objects_to_interact={objects_to_interact}, '
+                f'is_init_cond_frame={is_init_cond_frame}'
             )
         # partition the backbone features
         interactive_high_res_features = interactive_vision_feats = None
         interactive_feat_sizes = None
         if backbone_features_interactive is not None:
-            interactive_vision_feats = backbone_features_interactive["vision_feats"]
-            interactive_feat_sizes = backbone_features_interactive["feat_sizes"]
+            interactive_vision_feats = backbone_features_interactive['vision_feats']
+            interactive_feat_sizes = backbone_features_interactive['feat_sizes']
 
             # High-resolution feature maps for the SAM head, reshape (HW)BC => BCHW
             if len(interactive_vision_feats) > 1:
                 interactive_high_res_features = [
                     x.permute(1, 2, 0).view(x.size(1), x.size(2), *s)
-                    for x, s in zip(
-                        interactive_vision_feats[:-1], interactive_feat_sizes[:-1]
-                    )
+                    for x, s in zip(interactive_vision_feats[:-1], interactive_feat_sizes[:-1])
                 ]
         else:
             # cannot do point interaction without interactive features
-            assert mode not in ["interaction_only", "propagation_and_interaction"]
+            assert mode not in ['interaction_only', 'propagation_and_interaction']
 
         propagation_high_res_features = propagation_vision_feats = None
         propagation_vision_masks = None
         propagation_vision_pos_embeds = propagation_feat_sizes = None
         if backbone_features_propagation is not None:
-            propagation_vision_feats = backbone_features_propagation["vision_feats"]
-            propagation_vision_masks = backbone_features_propagation["vision_masks"]
-            propagation_vision_pos_embeds = backbone_features_propagation[
-                "vision_pos_embeds"
-            ]
-            propagation_feat_sizes = backbone_features_propagation["feat_sizes"]
+            propagation_vision_feats = backbone_features_propagation['vision_feats']
+            propagation_vision_masks = backbone_features_propagation['vision_masks']
+            propagation_vision_pos_embeds = backbone_features_propagation['vision_pos_embeds']
+            propagation_feat_sizes = backbone_features_propagation['feat_sizes']
 
             # High-resolution feature maps for the SAM head, reshape (HW)BC => BCHW
             if len(propagation_vision_feats) > 1:
                 propagation_high_res_features = [
                     x.permute(1, 2, 0).view(x.size(1), x.size(2), *s)
-                    for x, s in zip(
-                        propagation_vision_feats[:-1], propagation_feat_sizes[:-1]
-                    )
+                    for x, s in zip(propagation_vision_feats[:-1], propagation_feat_sizes[:-1])
                 ]
         else:
             # we can get away without propagation features if we are interacting and not encoding new memory
-            assert mode not in ["propagation_only", "propagation_and_interaction"]
+            assert mode not in ['propagation_only', 'propagation_and_interaction']
             assert not run_mem_encoder
 
         interactive_pix_feat = None
-        if mode == "mask_as_output":
+        if mode == 'mask_as_output':
             # simple encoding
             assert self.use_mask_input_as_output_without_sam
             # pix_feat = interactive_vision_feats[-1].permute(1, 2, 0)
@@ -2091,11 +1894,11 @@ class VideoTrackingMultiplex(nn.Module):
                 multiplex_state=multiplex_state,
             )
             # all the objects are conditional here
-            current_out["conditioning_objects"].update(range(mask_inputs.shape[0]))
+            current_out['conditioning_objects'].update(range(mask_inputs.shape[0]))
         else:
             # propagation, interaction, or both
             propagation_out = None
-            if mode in ["propagation_only", "propagation_and_interaction"]:
+            if mode in ['propagation_only', 'propagation_and_interaction']:
                 # gather the memory
                 assert backbone_features_propagation is not None
                 assert propagation_vision_feats is not None
@@ -2117,27 +1920,21 @@ class VideoTrackingMultiplex(nn.Module):
 
                 # propagate the mask
                 # this is the propagation step; do not consider point_inputs here
-                multimask_output = self._use_multimask(
-                    is_init_cond_frame, point_inputs=None
-                )
+                multimask_output = self._use_multimask(is_init_cond_frame, point_inputs=None)
                 propagation_out = self._forward_sam_heads(
                     backbone_features=pix_feat_with_mem,
                     propagation_high_res_features=propagation_high_res_features,
                     multimask_output=multimask_output,
-                    objects_to_interact=list(
-                        range(multiplex_state.total_valid_entries)
-                    ),
+                    objects_to_interact=list(range(multiplex_state.total_valid_entries)),
                     multiplex_state=multiplex_state,
                 )
 
             interaction_out = None
-            if mode in ["interaction_only", "propagation_and_interaction"]:
+            if mode in ['interaction_only', 'propagation_and_interaction']:
                 assert backbone_features_interactive is not None
                 assert interactive_vision_feats is not None
                 assert interactive_feat_sizes is not None
-                interactive_pix_feat = self._get_interactive_pix_mem(
-                    interactive_vision_feats, interactive_feat_sizes
-                )
+                interactive_pix_feat = self._get_interactive_pix_mem(interactive_vision_feats, interactive_feat_sizes)
 
                 # apply SAM-style segmentation head
                 # here we might feed previously predicted low-res SAM mask logits into the SAM mask decoder,
@@ -2148,25 +1945,19 @@ class VideoTrackingMultiplex(nn.Module):
                 if prev_sam_mask_logits is not None:
                     assert objects_to_interact is not None
                     assert self.iter_use_prev_mask_pred
-                    assert mode != "propagation_and_interaction"
+                    assert mode != 'propagation_and_interaction'
                     mask_inputs = prev_sam_mask_logits[objects_to_interact]
-                elif mode == "propagation_and_interaction":
+                elif mode == 'propagation_and_interaction':
                     # use propagated masks as mask input
                     assert objects_to_interact is not None
                     assert propagation_out is not None
-                    mask_inputs = propagation_out["low_res_masks"][objects_to_interact]
+                    mask_inputs = propagation_out['low_res_masks'][objects_to_interact]
 
                 if objects_to_interact is not None:
-                    assert point_inputs["point_coords"].shape[0] == len(
-                        objects_to_interact
-                    )
-                    assert point_inputs["point_labels"].shape[0] == len(
-                        objects_to_interact
-                    )
+                    assert point_inputs['point_coords'].shape[0] == len(objects_to_interact)
+                    assert point_inputs['point_labels'].shape[0] == len(objects_to_interact)
 
-                multimask_output = self._use_multimask(
-                    is_init_cond_frame, point_inputs=point_inputs
-                )
+                multimask_output = self._use_multimask(is_init_cond_frame, point_inputs=point_inputs)
                 interaction_out = self._forward_sam_heads(
                     backbone_features=interactive_pix_feat,
                     point_inputs=point_inputs,
@@ -2181,11 +1972,9 @@ class VideoTrackingMultiplex(nn.Module):
                     multiplex_state=multiplex_state,
                 )
                 if objects_to_interact is None:
-                    current_out["conditioning_objects"].update(
-                        multiplex_state.get_all_valid_object_idx()
-                    )
+                    current_out['conditioning_objects'].update(multiplex_state.get_all_valid_object_idx())
                 else:
-                    current_out["conditioning_objects"].update(objects_to_interact)
+                    current_out['conditioning_objects'].update(objects_to_interact)
 
             if propagation_out is None and interaction_out is not None:
                 sam_outputs = interaction_out
@@ -2195,13 +1984,13 @@ class VideoTrackingMultiplex(nn.Module):
                 # merge the output
                 assert propagation_out is not None and interaction_out is not None
                 keys_to_merge = [
-                    "low_res_multimasks",
-                    "high_res_multimasks",
-                    "low_res_masks",
-                    "high_res_masks",
-                    "ious",
-                    "object_score_logits",
-                    "obj_ptr",
+                    'low_res_multimasks',
+                    'high_res_multimasks',
+                    'low_res_masks',
+                    'high_res_masks',
+                    'ious',
+                    'object_score_logits',
+                    'obj_ptr',
                 ]
                 for k in keys_to_merge:
                     # pyre-fixme[26]: TypedDict key must be a string literal.
@@ -2216,23 +2005,23 @@ class VideoTrackingMultiplex(nn.Module):
                     propagation_out[k][objects_to_interact] = src
                 sam_outputs = propagation_out
 
-        low_res_multimasks = sam_outputs["low_res_multimasks"]
-        high_res_multimasks = sam_outputs["high_res_multimasks"]
-        ious = sam_outputs["ious"]
-        low_res_masks = sam_outputs["low_res_masks"]
-        high_res_masks = sam_outputs["high_res_masks"]
-        object_score_logits = sam_outputs["object_score_logits"]
+        low_res_multimasks = sam_outputs['low_res_multimasks']
+        high_res_multimasks = sam_outputs['high_res_multimasks']
+        ious = sam_outputs['ious']
+        low_res_masks = sam_outputs['low_res_masks']
+        high_res_masks = sam_outputs['high_res_masks']
+        object_score_logits = sam_outputs['object_score_logits']
 
-        current_out["multistep_pred_masks"] = low_res_masks
-        current_out["multistep_pred_masks_high_res"] = high_res_masks
-        current_out["multistep_pred_multimasks"] = [low_res_multimasks]
-        current_out["multistep_pred_multimasks_high_res"] = [high_res_multimasks]
-        current_out["multistep_pred_ious"] = [ious]
-        current_out["multistep_point_inputs"] = [point_inputs]
-        current_out["multistep_object_score_logits"] = [object_score_logits]
+        current_out['multistep_pred_masks'] = low_res_masks
+        current_out['multistep_pred_masks_high_res'] = high_res_masks
+        current_out['multistep_pred_multimasks'] = [low_res_multimasks]
+        current_out['multistep_pred_multimasks_high_res'] = [high_res_multimasks]
+        current_out['multistep_pred_ious'] = [ious]
+        current_out['multistep_point_inputs'] = [point_inputs]
+        current_out['multistep_object_score_logits'] = [object_score_logits]
 
         if self.use_obj_ptrs_in_encoder:
-            obj_ptr = sam_outputs["obj_ptr"]
+            obj_ptr = sam_outputs['obj_ptr']
 
         # Optionally, sample correction points iteratively to correct the mask
         if frame_idx in frames_to_add_correction_pt:
@@ -2251,9 +2040,7 @@ class VideoTrackingMultiplex(nn.Module):
             if self.training:
                 assert objects_to_interact is None
 
-                interact_with_all_objects = (
-                    self.rng.random() < self.prob_correct_all_objects_for_train
-                ) or (
+                interact_with_all_objects = (self.rng.random() < self.prob_correct_all_objects_for_train) or (
                     self.force_correct_all_for_conditional_inputs and is_init_cond_frame
                 )
 
@@ -2262,19 +2049,12 @@ class VideoTrackingMultiplex(nn.Module):
                 elif self.rand_objects_to_correct_for_train:
                     num_objects_to_correct = self.rng2.integers(
                         1,
-                        int(
-                            gt_masks.shape[0]
-                            * self.ratio_of_objects_to_correct_for_train
-                        )
-                        + 1,
+                        int(gt_masks.shape[0] * self.ratio_of_objects_to_correct_for_train) + 1,
                     )
                 else:
                     num_objects_to_correct = max(
                         1,
-                        int(
-                            gt_masks.shape[0]
-                            * self.ratio_of_objects_to_correct_for_train
-                        ),
+                        int(gt_masks.shape[0] * self.ratio_of_objects_to_correct_for_train),
                     )
 
                 objects_to_interact = self.rng2.choice(
@@ -2286,44 +2066,34 @@ class VideoTrackingMultiplex(nn.Module):
                 if point_inputs is not None:
                     # don't modify the point inputs in-place
                     point_inputs = {
-                        "point_coords": point_inputs["point_coords"][
-                            objects_to_interact
-                        ],
-                        "point_labels": point_inputs["point_labels"][
-                            objects_to_interact
-                        ],
+                        'point_coords': point_inputs['point_coords'][objects_to_interact],
+                        'point_labels': point_inputs['point_labels'][objects_to_interact],
                     }
             else:
                 assert objects_to_interact is not None
                 # the point inputs should have been preselected, i.e., the following assertion should hold
 
             if point_inputs is not None:
-                assert point_inputs["point_coords"].shape[0] == len(objects_to_interact)
-                assert point_inputs["point_labels"].shape[0] == len(objects_to_interact)
+                assert point_inputs['point_coords'].shape[0] == len(objects_to_interact)
+                assert point_inputs['point_labels'].shape[0] == len(objects_to_interact)
 
             for _ in range(self.num_correction_pt_per_frame):
                 # sample a new point from the error between prediction and ground-truth
                 # (with a small probability, directly sample from GT masks instead of errors)
                 if self.training and self.prob_to_sample_from_gt_for_train > 0:
-                    sample_from_gt = (
-                        self.rng.random() < self.prob_to_sample_from_gt_for_train
-                    )
+                    sample_from_gt = self.rng.random() < self.prob_to_sample_from_gt_for_train
                 else:
                     sample_from_gt = False
                 # if `pred_for_new_pt` is None, only GT masks will be used for point sampling
                 pred_for_new_pt = None if sample_from_gt else (high_res_masks > 0)
                 new_points, new_labels = get_next_point(
                     gt_masks=gt_masks[objects_to_interact],
-                    pred_masks=(
-                        pred_for_new_pt[objects_to_interact]
-                        if pred_for_new_pt is not None
-                        else None
-                    ),
-                    method="uniform" if self.training else self.pt_sampling_for_eval,
+                    pred_masks=(pred_for_new_pt[objects_to_interact] if pred_for_new_pt is not None else None),
+                    method='uniform' if self.training else self.pt_sampling_for_eval,
                 )
                 point_inputs = concat_points(point_inputs, new_points, new_labels)
                 assert low_res_masks.shape[0] > max(objects_to_interact), (
-                    f"interacting {objects_to_interact} in {low_res_masks.shape}?"
+                    f'interacting {objects_to_interact} in {low_res_masks.shape}?'
                 )
                 if self.iter_use_prev_mask_pred:
                     # Feed the mask logits of the previous SAM outputs in the next SAM decoder step.
@@ -2331,9 +2101,7 @@ class VideoTrackingMultiplex(nn.Module):
                     # the tracking output mask logits along with the click as input to the SAM decoder.
                     mask_inputs = low_res_masks[objects_to_interact]
                 multimask_output = self._use_multimask(is_init_cond_frame, point_inputs)
-                pix_feat_with_mem = self._get_interactive_pix_mem(
-                    interactive_vision_feats, interactive_feat_sizes
-                )
+                pix_feat_with_mem = self._get_interactive_pix_mem(interactive_vision_feats, interactive_feat_sizes)
                 sam_outputs = self._forward_sam_heads(
                     backbone_features=pix_feat_with_mem,
                     point_inputs=point_inputs,
@@ -2345,14 +2113,14 @@ class VideoTrackingMultiplex(nn.Module):
                     objects_to_interact=objects_to_interact,
                     multiplex_state=multiplex_state,
                 )
-                interact_low_res_multimasks = sam_outputs["low_res_multimasks"]
-                interact_high_res_multimasks = sam_outputs["high_res_multimasks"]
-                interact_ious = sam_outputs["ious"]
-                interact_low_res_masks = sam_outputs["low_res_masks"]
-                interact_high_res_masks = sam_outputs["high_res_masks"]
-                interact_object_score_logits = sam_outputs["object_score_logits"]
+                interact_low_res_multimasks = sam_outputs['low_res_multimasks']
+                interact_high_res_multimasks = sam_outputs['high_res_multimasks']
+                interact_ious = sam_outputs['ious']
+                interact_low_res_masks = sam_outputs['low_res_masks']
+                interact_high_res_masks = sam_outputs['high_res_masks']
+                interact_object_score_logits = sam_outputs['object_score_logits']
                 if self.use_obj_ptrs_in_encoder:
-                    interact_obj_ptr = sam_outputs["obj_ptr"]
+                    interact_obj_ptr = sam_outputs['obj_ptr']
 
                 if self.training:
                     # combine the masks from the interacted and non-interacted objects
@@ -2370,47 +2138,34 @@ class VideoTrackingMultiplex(nn.Module):
                     torch.is_floating_point(interact_low_res_masks)
                     and interact_low_res_masks.dtype != low_res_masks.dtype
                 ):
-                    interact_low_res_masks = interact_low_res_masks.to(
-                        dtype=low_res_masks.dtype
-                    )
+                    interact_low_res_masks = interact_low_res_masks.to(dtype=low_res_masks.dtype)
                 low_res_masks[objects_to_interact] = interact_low_res_masks
                 if (
                     torch.is_floating_point(interact_high_res_masks)
                     and interact_high_res_masks.dtype != high_res_masks.dtype
                 ):
-                    interact_high_res_masks = interact_high_res_masks.to(
-                        dtype=high_res_masks.dtype
-                    )
+                    interact_high_res_masks = interact_high_res_masks.to(dtype=high_res_masks.dtype)
                 high_res_masks[objects_to_interact] = interact_high_res_masks
                 if (
                     torch.is_floating_point(interact_low_res_multimasks)
                     and interact_low_res_multimasks.dtype != low_res_multimasks.dtype
                 ):
-                    interact_low_res_multimasks = interact_low_res_multimasks.to(
-                        dtype=low_res_multimasks.dtype
-                    )
+                    interact_low_res_multimasks = interact_low_res_multimasks.to(dtype=low_res_multimasks.dtype)
                 low_res_multimasks[objects_to_interact] = interact_low_res_multimasks
                 if (
                     torch.is_floating_point(interact_high_res_multimasks)
                     and interact_high_res_multimasks.dtype != high_res_multimasks.dtype
                 ):
-                    interact_high_res_multimasks = interact_high_res_multimasks.to(
-                        dtype=high_res_multimasks.dtype
-                    )
+                    interact_high_res_multimasks = interact_high_res_multimasks.to(dtype=high_res_multimasks.dtype)
                 high_res_multimasks[objects_to_interact] = interact_high_res_multimasks
-                if (
-                    torch.is_floating_point(interact_ious)
-                    and interact_ious.dtype != ious.dtype
-                ):
+                if torch.is_floating_point(interact_ious) and interact_ious.dtype != ious.dtype:
                     interact_ious = interact_ious.to(dtype=ious.dtype)
                 ious[objects_to_interact] = interact_ious
                 if (
                     torch.is_floating_point(interact_object_score_logits)
                     and interact_object_score_logits.dtype != object_score_logits.dtype
                 ):
-                    interact_object_score_logits = interact_object_score_logits.to(
-                        dtype=object_score_logits.dtype
-                    )
+                    interact_object_score_logits = interact_object_score_logits.to(dtype=object_score_logits.dtype)
                 object_score_logits[objects_to_interact] = interact_object_score_logits
                 if self.use_obj_ptrs_in_encoder:
                     # pyre-fixme[61]: `obj_ptr` is undefined, or not always defined.
@@ -2428,42 +2183,34 @@ class VideoTrackingMultiplex(nn.Module):
 
             # Concatenate the masks along channel (to compute losses on all of them,
             # using `onevision.losses.loss_fns.MultiStepIteractiveMasks`)
-            current_out["multistep_pred_masks"] = torch.cat(all_pred_masks, dim=1)
-            current_out["multistep_pred_masks_high_res"] = torch.cat(
-                all_pred_high_res_masks, dim=1
-            )
-            current_out["multistep_pred_multimasks"] = all_pred_multimasks
-            current_out["multistep_pred_multimasks_high_res"] = (
-                all_pred_high_res_multimasks
-            )
-            current_out["multistep_pred_ious"] = all_pred_ious
-            current_out["multistep_point_inputs"] = all_point_inputs
-            current_out["multistep_object_score_logits"] = all_object_score_logits
+            current_out['multistep_pred_masks'] = torch.cat(all_pred_masks, dim=1)
+            current_out['multistep_pred_masks_high_res'] = torch.cat(all_pred_high_res_masks, dim=1)
+            current_out['multistep_pred_multimasks'] = all_pred_multimasks
+            current_out['multistep_pred_multimasks_high_res'] = all_pred_high_res_multimasks
+            current_out['multistep_pred_ious'] = all_pred_ious
+            current_out['multistep_point_inputs'] = all_point_inputs
+            current_out['multistep_object_score_logits'] = all_object_score_logits
 
             if self.add_all_frames_to_correct_as_cond:
                 if objects_to_interact is None:
-                    current_out["conditioning_objects"].update(
-                        multiplex_state.get_all_valid_object_idx()
-                    )
+                    current_out['conditioning_objects'].update(multiplex_state.get_all_valid_object_idx())
                 else:
-                    current_out["conditioning_objects"].update(set(objects_to_interact))
+                    current_out['conditioning_objects'].update(set(objects_to_interact))
 
         # Use the final prediction (after all correction steps for output and eval)
-        current_out["pred_masks"] = low_res_masks
-        current_out["pred_masks_high_res"] = high_res_masks
+        current_out['pred_masks'] = low_res_masks
+        current_out['pred_masks_high_res'] = high_res_masks
         if self.use_obj_ptrs_in_encoder:
             # similar to spatial memory, the object pointers are stored with multiplex
             # pyre-fixme[61]: `obj_ptr` is undefined, or not always defined.
-            current_out["obj_ptr"] = multiplex_state.mux(obj_ptr)
+            current_out['obj_ptr'] = multiplex_state.mux(obj_ptr)
         if self.use_memory_selection:
-            current_out["object_score_logits"] = object_score_logits
-            iou_score = current_out["multistep_pred_ious"][-1].max(-1)[0]
-            current_out["iou_score"] = iou_score
-            current_out["eff_iou_score"] = self.cal_mem_score(
-                object_score_logits, iou_score
-            )
+            current_out['object_score_logits'] = object_score_logits
+            iou_score = current_out['multistep_pred_ious'][-1].max(-1)[0]
+            current_out['iou_score'] = iou_score
+            current_out['eff_iou_score'] = self.cal_mem_score(object_score_logits, iou_score)
         # we need to return this for encoding new masks in the dynamic mode
-        current_out["object_score_logits"] = object_score_logits
+        current_out['object_score_logits'] = object_score_logits
 
         # Finally run the memory encoder on the predicted mask to encode
         # it into a new memory feature (that can be used in future frames)
@@ -2478,18 +2225,18 @@ class VideoTrackingMultiplex(nn.Module):
                 pred_masks_high_res=high_res_masks_for_mem_enc,
                 object_score_logits=object_score_logits,
                 is_mask_from_pts=(point_inputs is not None),
-                conditioning_objects=current_out["conditioning_objects"],
+                conditioning_objects=current_out['conditioning_objects'],
                 multiplex_state=multiplex_state,
             )
-            current_out["maskmem_features"] = maskmem_features
+            current_out['maskmem_features'] = maskmem_features
             # pyrefly: ignore [bad-assignment]
-            current_out["maskmem_pos_enc"] = maskmem_pos_enc
+            current_out['maskmem_pos_enc'] = maskmem_pos_enc
 
         if self.save_image_features:
             # pyrefly: ignore [unsupported-operation]
-            current_out["image_features"] = propagation_vision_feats[-1]
+            current_out['image_features'] = propagation_vision_feats[-1]
             # pyrefly: ignore [unsupported-operation]
-            current_out["image_pos_enc"] = propagation_vision_pos_embeds[-1]
+            current_out['image_pos_enc'] = propagation_vision_pos_embeds[-1]
 
         # this is to avoid recomputing some of these features for add_new_masks_to_existing_state
         aux_output = {}
@@ -2501,13 +2248,13 @@ class VideoTrackingMultiplex(nn.Module):
                     # pyrefly: ignore [bad-argument-type]
                     interactive_feat_sizes,
                 )
-            aux_output["interactive_pix_feat"] = interactive_pix_feat
+            aux_output['interactive_pix_feat'] = interactive_pix_feat
             # pyrefly: ignore [unsupported-operation]
-            aux_output["interactive_high_res_features"] = interactive_high_res_features
+            aux_output['interactive_high_res_features'] = interactive_high_res_features
             # pyrefly: ignore [unsupported-operation]
-            aux_output["propagation_vision_feats"] = propagation_vision_feats
+            aux_output['propagation_vision_feats'] = propagation_vision_feats
             # pyrefly: ignore [unsupported-operation]
-            aux_output["propagation_feat_sizes"] = propagation_feat_sizes
+            aux_output['propagation_feat_sizes'] = propagation_feat_sizes
 
         return current_out, aux_output
 
@@ -2523,58 +2270,54 @@ class VideoTrackingMultiplex(nn.Module):
         if self.offload_output_to_cpu_for_eval and not self.training:
             # Here we only keep those keys needed for evaluation to get a compact output
             trimmed_out: StageOutput = {
-                "conditioning_objects": current_out["conditioning_objects"],
-                "pred_masks": current_out["pred_masks"].cpu(),
-                "pred_masks_high_res": current_out["pred_masks_high_res"].cpu(),
+                'conditioning_objects': current_out['conditioning_objects'],
+                'pred_masks': current_out['pred_masks'].cpu(),
+                'pred_masks_high_res': current_out['pred_masks_high_res'].cpu(),
                 # other items for evaluation (these are small tensors so we keep them on GPU)
-                "object_score_logits": current_out["object_score_logits"],
-                "multistep_point_inputs": current_out["multistep_point_inputs"],
+                'object_score_logits': current_out['object_score_logits'],
+                'multistep_point_inputs': current_out['multistep_point_inputs'],
             }
             if self.use_obj_ptrs_in_encoder:
-                trimmed_out["obj_ptr"] = current_out["obj_ptr"]
+                trimmed_out['obj_ptr'] = current_out['obj_ptr']
             if memory_encoder_was_used and self.num_maskmem > 0:
-                trimmed_out["maskmem_features"] = current_out["maskmem_features"].cpu()
-                trimmed_out["maskmem_pos_enc"] = [
-                    x.cpu() for x in current_out["maskmem_pos_enc"]
-                ]
+                trimmed_out['maskmem_features'] = current_out['maskmem_features'].cpu()
+                trimmed_out['maskmem_pos_enc'] = [x.cpu() for x in current_out['maskmem_pos_enc']]
             if self.save_image_features:
-                trimmed_out["image_features"] = current_out["image_features"].cpu()
-                trimmed_out["image_pos_enc"] = current_out["image_pos_enc"].cpu()
+                trimmed_out['image_features'] = current_out['image_features'].cpu()
+                trimmed_out['image_pos_enc'] = current_out['image_pos_enc'].cpu()
             current_out = trimmed_out
 
         # Optionally, trim the output of past non-conditioning frame (r * num_maskmem frames
         # before the current frame) during evaluation. This is intended to save GPU or CPU
         # memory for semi-supervised VOS eval, where only the first frame receives prompts.
-        def _trim_past_out(
-            past_out: StageOutput, current_out: StageOutput
-        ) -> Optional[StageOutput]:
+        def _trim_past_out(past_out: StageOutput, current_out: StageOutput) -> Optional[StageOutput]:
             if past_out is None:
                 return None
             trimmed_past_out: StageOutput = {
-                "conditioning_objects": past_out["conditioning_objects"],
-                "pred_masks": past_out["pred_masks"],
-                "object_score_logits": past_out["object_score_logits"],
+                'conditioning_objects': past_out['conditioning_objects'],
+                'pred_masks': past_out['pred_masks'],
+                'object_score_logits': past_out['object_score_logits'],
                 # Why would this be current_out?
                 # "multistep_point_inputs": current_out["multistep_point_inputs"],
-                "multistep_point_inputs": past_out["multistep_point_inputs"],
+                'multistep_point_inputs': past_out['multistep_point_inputs'],
             }
             if self.use_obj_ptrs_in_encoder:
-                trimmed_past_out["obj_ptr"] = past_out["obj_ptr"]
+                trimmed_past_out['obj_ptr'] = past_out['obj_ptr']
             return trimmed_past_out
 
         if self.trim_past_non_cond_mem_for_eval and not self.training:
             r = self.memory_temporal_stride_for_eval
             past_frame_idx = frame_idx - r * self.num_maskmem
-            past_out = output_dict["non_cond_frame_outputs"].get(past_frame_idx, None)
+            past_out = output_dict['non_cond_frame_outputs'].get(past_frame_idx, None)
 
             if past_out is not None:
                 if (
                     self.use_memory_selection
                     # pyre-fixme[58]: `<` is not supported for operand types
                     #  `Union[int, Tensor]` and `float`.
-                    and past_out.get("eff_iou_score", 0) < self.mf_threshold
+                    and past_out.get('eff_iou_score', 0) < self.mf_threshold
                 ) or not self.use_memory_selection:
-                    output_dict["non_cond_frame_outputs"][past_frame_idx] = (
+                    output_dict['non_cond_frame_outputs'][past_frame_idx] = (
                         # pyre-fixme[6]: For 2nd argument expected `StageOutput` but
                         #  got `Optional[StageOutput]`.
                         _trim_past_out(past_out, current_out)
@@ -2584,11 +2327,9 @@ class VideoTrackingMultiplex(nn.Module):
                 self.use_memory_selection and not self.offload_output_to_cpu_for_eval
             ):  # design for memory selection, trim too old frames to save memory
                 far_old_frame_idx = frame_idx - 20 * self.max_obj_ptrs_in_encoder
-                past_out = output_dict["non_cond_frame_outputs"].get(
-                    far_old_frame_idx, None
-                )
+                past_out = output_dict['non_cond_frame_outputs'].get(far_old_frame_idx, None)
                 if past_out is not None:
-                    output_dict["non_cond_frame_outputs"][far_old_frame_idx] = (
+                    output_dict['non_cond_frame_outputs'][far_old_frame_idx] = (
                         # pyre-fixme[6]: For 2nd argument expected `StageOutput` but
                         #  got `Optional[StageOutput]`.
                         _trim_past_out(past_out, current_out)
@@ -2652,14 +2393,14 @@ class VideoTrackingMultiplex(nn.Module):
     def back_convert(self, targets):
         """To be compatible with SetCriterionAPI losses (mask loss only)."""
         batched_targets = {}
-        batched_targets["num_boxes"] = targets.num_boxes
-        batched_targets["masks"] = targets.segments
-        batched_targets["is_valid_mask"] = targets.is_valid_segment
+        batched_targets['num_boxes'] = targets.num_boxes
+        batched_targets['masks'] = targets.segments
+        batched_targets['is_valid_mask'] = targets.is_valid_segment
         return batched_targets
 
     def _use_multimask(self, is_init_cond_frame, point_inputs):
         """Whether to use multimask output in the SAM head."""
-        num_pts = 0 if point_inputs is None else point_inputs["point_labels"].size(1)
+        num_pts = 0 if point_inputs is None else point_inputs['point_labels'].size(1)
         multimask_output = (
             self.multimask_output_in_sam
             and (is_init_cond_frame or self.multimask_output_for_tracking)
@@ -2695,17 +2436,17 @@ class VideoTrackingMultiplex(nn.Module):
         torch._dynamo.config.cache_size_limit = 64
         torch._dynamo.config.accumulated_cache_size_limit = 2048
 
-        logging.info("Compiling all components. First time may be very slow.")
+        logging.info('Compiling all components. First time may be very slow.')
 
         self.maskmem_backbone.forward = torch.compile(
             self.maskmem_backbone.forward,
-            mode="max-autotune",
+            mode='max-autotune',
             fullgraph=True,
             dynamic=False,
         )
         self.transformer.encoder.forward = torch.compile(
             self.transformer.encoder.forward,
-            mode="max-autotune",
+            mode='max-autotune',
             fullgraph=True,
             dynamic=True,  # Num. of memories varies
         )
@@ -2719,7 +2460,7 @@ class VideoTrackingMultiplex(nn.Module):
         # )
         self.sam_mask_decoder.forward = torch.compile(
             self.sam_mask_decoder.forward,
-            mode="max-autotune",
+            mode='max-autotune',
             fullgraph=True,
             dynamic=False,  # Accuracy regression on True
         )
@@ -2737,9 +2478,7 @@ class VideoTrackingMultiplex(nn.Module):
           torch.Tensor: Positional encoding with shape
             1x(embed_dim)x(embedding_h)x(embedding_w)
         """
-        return self.image_pe_layer(
-            (self.sam_image_embedding_size, self.sam_image_embedding_size)
-        ).unsqueeze(0)
+        return self.image_pe_layer((self.sam_image_embedding_size, self.sam_image_embedding_size)).unsqueeze(0)
 
     def cal_mem_score(self, object_score_logits, iou_score):
         object_score_norm = torch.where(
@@ -2751,14 +2490,10 @@ class VideoTrackingMultiplex(nn.Module):
         return score_per_frame
 
     def frame_filter(self, output_dict, track_in_reverse, frame_idx, num_frames, r):
-        if (frame_idx == 0 and not track_in_reverse) or (
-            frame_idx == num_frames - 1 and track_in_reverse
-        ):
+        if (frame_idx == 0 and not track_in_reverse) or (frame_idx == num_frames - 1 and track_in_reverse):
             return []
 
-        max_num = min(
-            num_frames, self.max_obj_ptrs_in_encoder
-        )  # maximum number of pointer memory frames to consider
+        max_num = min(num_frames, self.max_obj_ptrs_in_encoder)  # maximum number of pointer memory frames to consider
 
         if not track_in_reverse:
             start = frame_idx - 1
@@ -2774,12 +2509,12 @@ class VideoTrackingMultiplex(nn.Module):
         valid_indices = []
         for i in range(start, end, step):
             if (
-                i not in output_dict["non_cond_frame_outputs"]
-                or "eff_iou_score" not in output_dict["non_cond_frame_outputs"][i]
+                i not in output_dict['non_cond_frame_outputs']
+                or 'eff_iou_score' not in output_dict['non_cond_frame_outputs'][i]
             ):
                 continue
 
-            score_per_frame = output_dict["non_cond_frame_outputs"][i]["eff_iou_score"]
+            score_per_frame = output_dict['non_cond_frame_outputs'][i]['eff_iou_score']
 
             if score_per_frame > self.mf_threshold:  # threshold
                 valid_indices.insert(0, i)
@@ -2798,17 +2533,15 @@ def concat_points(old_point_inputs, new_points, new_labels):
     if old_point_inputs is None:
         points, labels = new_points, new_labels
     else:
-        points = torch.cat([old_point_inputs["point_coords"], new_points], dim=1)
-        labels = torch.cat([old_point_inputs["point_labels"], new_labels], dim=1)
+        points = torch.cat([old_point_inputs['point_coords'], new_points], dim=1)
+        labels = torch.cat([old_point_inputs['point_labels'], new_labels], dim=1)
 
-    return {"point_coords": points, "point_labels": labels}
+    return {'point_coords': points, 'point_labels': labels}
 
 
-def _append(
-    d1: StageOutput, d2: SAMOutput, k1: str, k2: str, dim: int = 0, strict: bool = True
-):
+def _append(d1: StageOutput, d2: SAMOutput, k1: str, k2: str, dim: int = 0, strict: bool = True):
     if strict:
-        assert k1 in d1, f"{k1} not found"
+        assert k1 in d1, f'{k1} not found'
     else:
         if k1 not in d1:
             return
@@ -2828,7 +2561,7 @@ def _merge(
     strict: bool = True,
 ):
     if strict:
-        assert k1 in d1, f"{k1} not found"
+        assert k1 in d1, f'{k1} not found'
     else:
         if k1 not in d1:
             return
@@ -2898,58 +2631,47 @@ class VideoTrackingDynamicMultiplex(VideoTrackingMultiplex):
         """
 
         # First, prepare the prompt inputs following the parent class
-        backbone_out = super()._prepare_prompt_inputs_meta(
-            backbone_out, input, start_frame_idx=start_frame_idx
-        )
+        backbone_out = super()._prepare_prompt_inputs_meta(backbone_out, input, start_frame_idx=start_frame_idx)
 
-        num_frames = backbone_out["num_frames"]
-        gt_masks_per_frame = backbone_out["gt_masks_per_frame"]
+        num_frames = backbone_out['num_frames']
+        gt_masks_per_frame = backbone_out['gt_masks_per_frame']
 
         if self.training or self.is_dynamic_vos_evaluation:
-            visible_objects_per_frame: dict[int, set[int]] = (
-                input.visible_objects_per_frame
-            )
+            visible_objects_per_frame: dict[int, set[int]] = input.visible_objects_per_frame
         else:
             visible_objects_per_frame: dict[int, set[int]] = {
-                stage_id: set(range(gt_masks_per_frame[stage_id].shape[0]))
-                for stage_id in range(num_frames)
+                stage_id: set(range(gt_masks_per_frame[stage_id].shape[0])) for stage_id in range(num_frames)
             }
 
         # If we have more than one conditioning frame,
         # all visible objects on any of the conditioning frames become valid for all frames
-        init_cond_frames: list[int] = backbone_out["init_cond_frames"]
+        init_cond_frames: list[int] = backbone_out['init_cond_frames']
         init_cond_frames = sorted(init_cond_frames)
-        frames_not_in_init_cond: list[int] = backbone_out["frames_not_in_init_cond"]
+        frames_not_in_init_cond: list[int] = backbone_out['frames_not_in_init_cond']
 
         # Rare case: the data guard might fail and we could have an empty first frame.
         # In this case, we track an empty object.
         if len(visible_objects_per_frame[start_frame_idx]) == 0:
             if self.training:
-                logging.warning("Empty first frame, tracking an empty object")
+                logging.warning('Empty first frame, tracking an empty object')
                 visible_objects_per_frame[start_frame_idx] = {0}
                 # set the GT mask for this object to be all zeros
                 for stage_id in range(num_frames):
-                    gt_masks_per_frame[stage_id][0] = torch.zeros_like(
-                        gt_masks_per_frame[stage_id][0]
-                    )
+                    gt_masks_per_frame[stage_id][0] = torch.zeros_like(gt_masks_per_frame[stage_id][0])
             else:
                 # During evaluation, this should only happen for YouTubeVOS.
                 # We will skip the frames before the first conditional frame.
-                assert self.is_dynamic_vos_evaluation, (
-                    f"{visible_objects_per_frame=} invalid"
-                )
+                assert self.is_dynamic_vos_evaluation, f'{visible_objects_per_frame=} invalid'
                 assert len(init_cond_frames) == 1
                 for stage_id in range(start_frame_idx, num_frames):
                     if len(visible_objects_per_frame[stage_id]) > 0:
                         init_cond_frames = [stage_id]
                         break
-                for i in range(
-                    init_cond_frames[0] + 1
-                ):  # also remove init_cond_frames[0]
+                for i in range(init_cond_frames[0] + 1):  # also remove init_cond_frames[0]
                     if i in frames_not_in_init_cond:
                         frames_not_in_init_cond.remove(i)
 
-        backbone_out["init_cond_frames"] = init_cond_frames
+        backbone_out['init_cond_frames'] = init_cond_frames
 
         # The object idx in valid_idx_per_frame should be in sequential order.
         # We will first reshuffle the objects using object_appearance_order,
@@ -2963,16 +2685,12 @@ class VideoTrackingDynamicMultiplex(VideoTrackingMultiplex):
             # Select the number of transition points
             if self.rand_num_transition_points:
                 # Randomly select 1 to `max_num_transition_points` transition points
-                num_transition_points = self.rng.integers(
-                    1, self.max_num_transition_points, endpoint=True
-                )
+                num_transition_points = self.rng.integers(1, self.max_num_transition_points, endpoint=True)
             else:
                 num_transition_points = self.max_num_transition_points
 
             available_transition_points = frames_not_in_init_cond
-            num_transition_points = min(
-                num_transition_points, len(available_transition_points)
-            )
+            num_transition_points = min(num_transition_points, len(available_transition_points))
             # num_transition_points can differ between GPUs so we use rng2
             transition_points = self.rng2.choice(
                 available_transition_points, num_transition_points, replace=False
@@ -2987,9 +2705,7 @@ class VideoTrackingDynamicMultiplex(VideoTrackingMultiplex):
 
             for stage_id in range(start_frame_idx, num_frames):
                 if stage_id in transition_points:
-                    new_objects_seen = (
-                        visible_objects_per_frame[stage_id] - objects_seen
-                    )
+                    new_objects_seen = visible_objects_per_frame[stage_id] - objects_seen
                     if len(new_objects_seen) > 0:
                         filtered_transition_points.append(stage_id)
                         objects_seen.update(new_objects_seen)
@@ -3010,9 +2726,7 @@ class VideoTrackingDynamicMultiplex(VideoTrackingMultiplex):
                     # When objects appear at a transition point, we add them to the end of the list
                     stage_objects = new_idx_per_transition[stage_id].copy()
                     self.rng2.shuffle(stage_objects)
-                    valid_idx_prior_to_each_transition[stage_id] = list(
-                        range(len(object_appearance_order))
-                    )
+                    valid_idx_prior_to_each_transition[stage_id] = list(range(len(object_appearance_order)))
                     new_idx_per_transition[stage_id] = list(
                         range(
                             len(object_appearance_order),
@@ -3028,16 +2742,12 @@ class VideoTrackingDynamicMultiplex(VideoTrackingMultiplex):
                     # For example, if [1, 2, 4] are visible on the two init cond frames (e.g., frame 0 and frame 5),
                     # and object 3 appears on frame 4 (as a transition point), object 3 would not be considered valid on frame 5.
                     # This should not break any processing steps or affect correctness (since invalid objects are marked as floating).
-                    valid_idx_per_frame[stage_id] = valid_idx_per_frame[
-                        start_frame_idx
-                    ].copy()
+                    valid_idx_per_frame[stage_id] = valid_idx_per_frame[start_frame_idx].copy()
                 elif stage_id in frames_not_in_init_cond:
-                    valid_idx_per_frame[stage_id] = list(
-                        range(len(object_appearance_order))
-                    )
+                    valid_idx_per_frame[stage_id] = list(range(len(object_appearance_order)))
                 else:
                     raise ValueError(
-                        f"Unexpected {stage_id=}? {init_cond_frames=} {frames_not_in_init_cond=} {transition_points=}"
+                        f'Unexpected {stage_id=}? {init_cond_frames=} {frames_not_in_init_cond=} {transition_points=}'
                     )
         elif self.is_dynamic_vos_evaluation and not self.training:
             # In dynamic VOS evaluation, we find the transition points manually.
@@ -3071,9 +2781,7 @@ class VideoTrackingDynamicMultiplex(VideoTrackingMultiplex):
                     num_objects_before = len(objects_seen_so_far)
 
                     # Record which objects were valid before this transition
-                    valid_idx_prior_to_each_transition[stage_id] = list(
-                        range(num_objects_before)
-                    )
+                    valid_idx_prior_to_each_transition[stage_id] = list(range(num_objects_before))
                     # Record the indices of new objects
                     new_idx_per_transition[stage_id] = list(
                         range(num_objects_before, num_objects_before + len(new_objects))
@@ -3084,22 +2792,16 @@ class VideoTrackingDynamicMultiplex(VideoTrackingMultiplex):
                 # Set valid objects for this frame
                 if stage_id in init_cond_frames:
                     # For init cond frames, only the initial objects are valid
-                    valid_idx_per_frame[stage_id] = list(
-                        range(len(stage_to_new_objects[stage_id]))
-                    )
+                    valid_idx_per_frame[stage_id] = list(range(len(stage_to_new_objects[stage_id])))
                     objects_seen_so_far.extend(stage_to_new_objects[stage_id])
                 else:
                     # For other frames, all objects seen so far are valid
-                    valid_idx_per_frame[stage_id] = list(
-                        range(len(objects_seen_so_far))
-                    )
+                    valid_idx_per_frame[stage_id] = list(range(len(objects_seen_so_far)))
 
         else:
             # Use no transition points when dynamic training is disabled
             transition_points = []
-            visible_objects_on_first_frame = sorted(
-                list(visible_objects_per_frame[start_frame_idx])
-            )
+            visible_objects_on_first_frame = sorted(list(visible_objects_per_frame[start_frame_idx]))
             # Since visible_objects_on_first_frame might not be consecutive
             object_orderings = list(range(len(visible_objects_on_first_frame)))
             # Use the original order for evaluation
@@ -3109,9 +2811,9 @@ class VideoTrackingDynamicMultiplex(VideoTrackingMultiplex):
 
         # Apply the appearance-based mapping to ground-truth masks
         for stage_id in range(start_frame_idx, num_frames):
-            gt_masks_per_frame[stage_id] = gt_masks_per_frame[stage_id][
-                object_appearance_order
-            ][valid_idx_per_frame[stage_id]]
+            gt_masks_per_frame[stage_id] = gt_masks_per_frame[stage_id][object_appearance_order][
+                valid_idx_per_frame[stage_id]
+            ]
 
         # We also want to apply this change in-place to the input, such that loss can be computed correctly.
         # For targets.segments, we need to delay the object introduction by 1 frame.
@@ -3129,14 +2831,12 @@ class VideoTrackingDynamicMultiplex(VideoTrackingMultiplex):
             # Although this is called num_boxes, it actually stores an array of ones with length=number of objects in the VOS setting.
             targets.num_boxes = targets.num_boxes[: targets.segments.shape[0]]
 
-        backbone_out["valid_idx_per_frame"] = valid_idx_per_frame
-        backbone_out["new_idx_per_transition"] = new_idx_per_transition
-        backbone_out["valid_objects_prior_to_each_transition"] = (
-            valid_idx_prior_to_each_transition
-        )
-        backbone_out["transition_points"] = set(transition_points)
-        backbone_out["gt_masks_per_frame"] = gt_masks_per_frame
-        backbone_out["object_appearance_order"] = object_appearance_order
+        backbone_out['valid_idx_per_frame'] = valid_idx_per_frame
+        backbone_out['new_idx_per_transition'] = new_idx_per_transition
+        backbone_out['valid_objects_prior_to_each_transition'] = valid_idx_prior_to_each_transition
+        backbone_out['transition_points'] = set(transition_points)
+        backbone_out['gt_masks_per_frame'] = gt_masks_per_frame
+        backbone_out['object_appearance_order'] = object_appearance_order
 
         backbone_out = self._prepare_conditional_frames(backbone_out)
 
@@ -3147,19 +2847,11 @@ class VideoTrackingDynamicMultiplex(VideoTrackingMultiplex):
         *,
         interactive_pix_feat: torch.Tensor,
         interactive_high_res_features: list[torch.Tensor],
-        propagation_vision_feats: Optional[
-            list[torch.Tensor]
-        ],  # needed when add_mask_to_memory=True
-        propagation_feat_sizes: Optional[
-            list[tuple[int, int]]
-        ],  # needed when add_mask_to_memory=True
+        propagation_vision_feats: Optional[list[torch.Tensor]],  # needed when add_mask_to_memory=True
+        propagation_feat_sizes: Optional[list[tuple[int, int]]],  # needed when add_mask_to_memory=True
         new_masks: torch.Tensor,
-        obj_idxs_in_mask: list[
-            int
-        ],  # len(obj_idxs_in_mask) == new_masks.shape[0]; object idx internal to this state
-        obj_ids_in_mask: Optional[
-            list[int]
-        ],  # len(obj_ids_in_mask) == new_masks.shape[0]; global object ids
+        obj_idxs_in_mask: list[int],  # len(obj_idxs_in_mask) == new_masks.shape[0]; object idx internal to this state
+        obj_ids_in_mask: Optional[list[int]],  # len(obj_ids_in_mask) == new_masks.shape[0]; global object ids
         prev_output: StageOutput,  # this state will be modified in-place
         multiplex_state: MultiplexState,
         add_mask_to_memory: bool = True,
@@ -3186,7 +2878,7 @@ class VideoTrackingDynamicMultiplex(VideoTrackingMultiplex):
 
         if self.use_obj_ptrs_in_encoder:
             # demux the existing pointers before we change the multiplex state
-            existing_pointers = multiplex_state.demux(prev_output["obj_ptr"])
+            existing_pointers = multiplex_state.demux(prev_output['obj_ptr'])
 
         # Step 1: Inform the multiplex state that we are adding new objects
         new_object_idx = multiplex_state.find_next_batch_of_available_indices(
@@ -3213,57 +2905,54 @@ class VideoTrackingDynamicMultiplex(VideoTrackingMultiplex):
         # Step 3: Merge the existing state with new encoded features
         # Handle resolution mismatch between propagation (e.g., 1008) and interactive (e.g., 288) features
         # Determine target resolution from interactive features (newly generated masks)
-        interactive_resolution = mask_output["high_res_masks"].shape[-1]
+        interactive_resolution = mask_output['high_res_masks'].shape[-1]
 
         # Check if prev_output needs resolution adjustment
-        if (
-            "pred_masks_high_res" in prev_output
-            and prev_output["pred_masks_high_res"] is not None
-        ):
-            existing_resolution = prev_output["pred_masks_high_res"].shape[-1]
+        if 'pred_masks_high_res' in prev_output and prev_output['pred_masks_high_res'] is not None:
+            existing_resolution = prev_output['pred_masks_high_res'].shape[-1]
 
             if existing_resolution != interactive_resolution:
                 # Resize existing outputs to match interactive resolution
                 # This happens when frame was bootstrapped with propagation features (1008)
                 # but we're now adding interactive masks (288)
-                prev_output["pred_masks_high_res"] = F.interpolate(
-                    prev_output["pred_masks_high_res"],
+                prev_output['pred_masks_high_res'] = F.interpolate(
+                    prev_output['pred_masks_high_res'],
                     size=(interactive_resolution, interactive_resolution),
-                    mode="bilinear",
+                    mode='bilinear',
                     align_corners=False,
                 )
 
         # Resize low_res_masks to match prev_output resolution
-        h, w = prev_output["pred_masks"].shape[-2:]
-        mask_output["low_res_masks"] = F.interpolate(
-            mask_output["low_res_masks"],
+        h, w = prev_output['pred_masks'].shape[-2:]
+        mask_output['low_res_masks'] = F.interpolate(
+            mask_output['low_res_masks'],
             size=(h, w),
             align_corners=False,
-            mode="bilinear",
+            mode='bilinear',
             antialias=True,  # use antialias for downsampling
         )
 
-        _append(prev_output, mask_output, "pred_masks", "low_res_masks")
+        _append(prev_output, mask_output, 'pred_masks', 'low_res_masks')
         _append(
             prev_output,
             mask_output,
-            "pred_masks_high_res",
-            "high_res_masks",
+            'pred_masks_high_res',
+            'high_res_masks',
             strict=False,
         )
-        _append(prev_output, mask_output, "object_score_logits", "object_score_logits")
+        _append(prev_output, mask_output, 'object_score_logits', 'object_score_logits')
         if self.use_memory_selection:
-            mask_output["ious"] = mask_output["ious"].squeeze(-1)
-            _append(prev_output, mask_output, "iou_score", "ious")
+            mask_output['ious'] = mask_output['ious'].squeeze(-1)
+            _append(prev_output, mask_output, 'iou_score', 'ious')
 
         # Merge the input masks
-        if "input_masks" in prev_output:
+        if 'input_masks' in prev_output:
             # pyre-fixme[27]: TypedDict `StageOutput` has no key `input_masks`.
-            prev_output["input_masks"] = torch.cat(
+            prev_output['input_masks'] = torch.cat(
                 # pyre-fixme[6]: For 1st argument expected `Union[List[Tensor],
                 #  tuple[Tensor, ...]]` but got `List[Union[Set[int], Tensor]]`.
                 # pyre-fixme[27]: TypedDict `StageOutput` has no key `input_masks`.
-                [prev_output["input_masks"], new_masks],
+                [prev_output['input_masks'], new_masks],
                 dim=0,
             )
 
@@ -3271,57 +2960,46 @@ class VideoTrackingDynamicMultiplex(VideoTrackingMultiplex):
             # Merge the object pointers. Note that the pointers in SAMOutput are in the data space,
             # while those in StageOutput are in the mux space.
             # pyrefly: ignore [unbound-name]
-            new_pointers = mask_output["obj_ptr"].to(existing_pointers.dtype)
+            new_pointers = mask_output['obj_ptr'].to(existing_pointers.dtype)
             # pyre-fixme[61]: `existing_pointers` is undefined, or not always defined.
             combined_pointers = torch.cat([existing_pointers, new_pointers], dim=0)
-            prev_output["obj_ptr"] = multiplex_state.mux(combined_pointers)
+            prev_output['obj_ptr'] = multiplex_state.mux(combined_pointers)
 
         # Step 4: Update the set of conditioning objects at this frame.
-        prev_output["conditioning_objects"].update(new_object_idx)
+        prev_output['conditioning_objects'].update(new_object_idx)
 
         # Step 5: Re-encode the spatial memory if needed
         if add_mask_to_memory:
-            assert (
-                prev_output["pred_masks_high_res"].shape[0]
-                == multiplex_state.total_valid_entries
-            )
+            assert prev_output['pred_masks_high_res'].shape[0] == multiplex_state.total_valid_entries
             # Add the new masks to the memory
             maskmem_features, maskmem_pos_enc = self._encode_new_memory(
                 image=None,
                 current_vision_feats=propagation_vision_feats,
                 feat_sizes=propagation_feat_sizes,
-                pred_masks_high_res=prev_output["pred_masks_high_res"],
-                object_score_logits=prev_output["object_score_logits"],
-                conditioning_objects=prev_output["conditioning_objects"],
+                pred_masks_high_res=prev_output['pred_masks_high_res'],
+                object_score_logits=prev_output['object_score_logits'],
+                conditioning_objects=prev_output['conditioning_objects'],
                 is_mask_from_pts=are_masks_from_pts,
                 multiplex_state=multiplex_state,
             )
-            prev_output["maskmem_features"] = maskmem_features
+            prev_output['maskmem_features'] = maskmem_features
             # pyrefly: ignore [bad-assignment]
-            prev_output["maskmem_pos_enc"] = maskmem_pos_enc
+            prev_output['maskmem_pos_enc'] = maskmem_pos_enc
             if self.save_image_features:
                 # They should already be in the state; no modification is needed
-                assert "image_features" in prev_output
-                assert "image_pos_enc" in prev_output
+                assert 'image_features' in prev_output
+                assert 'image_pos_enc' in prev_output
 
     def recondition_masks_in_existing_state(
         self,
         *,
         interactive_pix_feat: torch.Tensor,
         interactive_high_res_features: list[torch.Tensor],
-        propagation_vision_feats: Optional[
-            list[torch.Tensor]
-        ],  # needed when add_mask_to_memory=True
-        propagation_feat_sizes: Optional[
-            list[tuple[int, int]]
-        ],  # needed when add_mask_to_memory=True
+        propagation_vision_feats: Optional[list[torch.Tensor]],  # needed when add_mask_to_memory=True
+        propagation_feat_sizes: Optional[list[tuple[int, int]]],  # needed when add_mask_to_memory=True
         new_masks: torch.Tensor,
-        obj_idxs_in_mask: list[
-            int
-        ],  # len(obj_idxs_in_mask) == new_masks.shape[0]; object idx internal to this state
-        obj_ids_in_mask: Optional[
-            list[int]
-        ],  # len(obj_ids_in_mask) == new_masks.shape[0]; global object ids
+        obj_idxs_in_mask: list[int],  # len(obj_idxs_in_mask) == new_masks.shape[0]; object idx internal to this state
+        obj_ids_in_mask: Optional[list[int]],  # len(obj_ids_in_mask) == new_masks.shape[0]; global object ids
         prev_output: StageOutput,  # this state will be modified in-place
         multiplex_state: MultiplexState,
         add_mask_to_memory: bool = True,
@@ -3341,7 +3019,7 @@ class VideoTrackingDynamicMultiplex(VideoTrackingMultiplex):
 
         if self.use_obj_ptrs_in_encoder:
             # demux the existing pointers before we change the multiplex state
-            existing_pointers = multiplex_state.demux(prev_output["obj_ptr"])
+            existing_pointers = multiplex_state.demux(prev_output['obj_ptr'])
 
         # Step 1: Encode the incoming masks
         mask_output = self._use_mask_as_output(
@@ -3354,86 +3032,81 @@ class VideoTrackingDynamicMultiplex(VideoTrackingMultiplex):
 
         # Step 2: Merge the existing state with new encoded features
         # TODO: Remove this and fix the resolution mismatch
-        h, w = prev_output["pred_masks"].shape[-2:]
-        mask_output["low_res_masks"] = F.interpolate(
-            mask_output["low_res_masks"],
+        h, w = prev_output['pred_masks'].shape[-2:]
+        mask_output['low_res_masks'] = F.interpolate(
+            mask_output['low_res_masks'],
             size=(h, w),
             align_corners=False,
-            mode="bilinear",
+            mode='bilinear',
             antialias=True,  # use antialias for downsampling
         )
 
-        _merge(
-            prev_output, mask_output, "pred_masks", "low_res_masks", obj_idxs_in_mask
-        )
+        _merge(prev_output, mask_output, 'pred_masks', 'low_res_masks', obj_idxs_in_mask)
         _merge(
             prev_output,
             mask_output,
-            "pred_masks_high_res",
-            "high_res_masks",
+            'pred_masks_high_res',
+            'high_res_masks',
             obj_idxs_in_mask,
             strict=False,
         )
         _merge(
             prev_output,
             mask_output,
-            "object_score_logits",
-            "object_score_logits",
+            'object_score_logits',
+            'object_score_logits',
             obj_idxs_in_mask,
         )
         if self.use_memory_selection:
-            mask_output["ious"] = mask_output["ious"].squeeze(-1)
+            mask_output['ious'] = mask_output['ious'].squeeze(-1)
             _merge(
                 prev_output,
                 mask_output,
-                "iou_score",
-                "ious",
+                'iou_score',
+                'ious',
                 obj_idxs_in_mask,
             )
 
         # Merge the input masks
-        if "input_masks" in prev_output:
+        if 'input_masks' in prev_output:
             # pyre-fixme[16]: `set` has no attribute `__setitem__`.
             # pyre-fixme[27]: TypedDict `StageOutput` has no key `input_masks`.
-            prev_output["input_masks"][obj_idxs_in_mask] = new_masks
+            prev_output['input_masks'][obj_idxs_in_mask] = new_masks
 
         if self.use_obj_ptrs_in_encoder:
             # Merge the object pointers. Note that the pointers in SAMOutput are in the data space,
             # while those in StageOutput are in the mux space.
             # pyrefly: ignore [unbound-name]
-            new_pointers = mask_output["obj_ptr"].to(existing_pointers.dtype)
+            new_pointers = mask_output['obj_ptr'].to(existing_pointers.dtype)
             # pyre-fixme[61]: `existing_pointers` is undefined, or not always defined.
             existing_pointers[obj_idxs_in_mask] = new_pointers
             # pyre-fixme[61]: `existing_pointers` is undefined, or not always defined.
-            prev_output["obj_ptr"] = multiplex_state.mux(existing_pointers)
+            prev_output['obj_ptr'] = multiplex_state.mux(existing_pointers)
 
         # Step 3: Update the set of conditioning objects at this frame
-        prev_output["conditioning_objects"].update(obj_idxs_in_mask)
+        prev_output['conditioning_objects'].update(obj_idxs_in_mask)
 
         # Step 4: Re-encode the spatial memory if needed
         if add_mask_to_memory:
-            assert (
-                prev_output["pred_masks_high_res"].shape[0]
-                == multiplex_state.total_valid_entries
-            )
+            assert prev_output['pred_masks_high_res'].shape[0] == multiplex_state.total_valid_entries
             # Add the new masks to the memory
             maskmem_features, maskmem_pos_enc = self._encode_new_memory(
                 image=None,
                 current_vision_feats=propagation_vision_feats,
                 feat_sizes=propagation_feat_sizes,
-                pred_masks_high_res=prev_output["pred_masks_high_res"],
-                object_score_logits=prev_output["object_score_logits"],
-                conditioning_objects=prev_output["conditioning_objects"],
+                pred_masks_high_res=prev_output['pred_masks_high_res'],
+                object_score_logits=prev_output['object_score_logits'],
+                conditioning_objects=prev_output['conditioning_objects'],
                 is_mask_from_pts=False,
                 multiplex_state=multiplex_state,
             )
-            prev_output["maskmem_features"] = maskmem_features
+            prev_output['maskmem_features'] = maskmem_features
             # pyrefly: ignore [bad-assignment]
-            prev_output["maskmem_pos_enc"] = maskmem_pos_enc
+            prev_output['maskmem_pos_enc'] = maskmem_pos_enc
             if self.save_image_features:
                 # They should already be in the state; no modification is needed
-                assert "image_features" in prev_output
-                assert "image_pos_enc" in prev_output
+                assert 'image_features' in prev_output
+                assert 'image_pos_enc' in prev_output
 
     def track_step(
         self,
@@ -3494,10 +3167,10 @@ class VideoTrackingDynamicMultiplex(VideoTrackingMultiplex):
         if new_object_masks is not None:
             assert new_object_idxs is not None
             self.add_new_masks_to_existing_state(
-                interactive_pix_feat=aux_out["interactive_pix_feat"],
-                interactive_high_res_features=aux_out["interactive_high_res_features"],
-                propagation_vision_feats=aux_out["propagation_vision_feats"],
-                propagation_feat_sizes=aux_out["propagation_feat_sizes"],
+                interactive_pix_feat=aux_out['interactive_pix_feat'],
+                interactive_high_res_features=aux_out['interactive_high_res_features'],
+                propagation_vision_feats=aux_out['propagation_vision_feats'],
+                propagation_feat_sizes=aux_out['propagation_feat_sizes'],
                 new_masks=new_object_masks,
                 obj_idxs_in_mask=new_object_idxs,
                 obj_ids_in_mask=new_object_ids,
@@ -3526,9 +3199,7 @@ class VideoTrackingDynamicMultiplex(VideoTrackingMultiplex):
         objects_to_interact: Optional[list[int]] = None,
     ):
         """Forward video tracking on each frame (and sample correction clicks)."""
-        img_feats_already_computed = (
-            "interactive" in backbone_out or "sam2_backbone_out" in backbone_out
-        )
+        img_feats_already_computed = 'interactive' in backbone_out or 'sam2_backbone_out' in backbone_out
         if img_feats_already_computed:
             # Prepare the backbone features
             # - vision_feats and vision_pos_embeds are in (HW)BC format
@@ -3536,28 +3207,26 @@ class VideoTrackingDynamicMultiplex(VideoTrackingMultiplex):
             backbone_features = self._prepare_backbone_features(backbone_out)
 
         # Starting the stage loop
-        num_frames = backbone_out["num_frames"]
-        init_cond_frames = backbone_out["init_cond_frames"]
-        frames_to_add_correction_pt = backbone_out["frames_to_add_correction_pt"]
+        num_frames = backbone_out['num_frames']
+        init_cond_frames = backbone_out['init_cond_frames']
+        frames_to_add_correction_pt = backbone_out['frames_to_add_correction_pt']
         # First process all the initial conditioning frames to encode them as memory,
         # And then condition on them to track the remaining frames
-        processing_order = init_cond_frames + backbone_out["frames_not_in_init_cond"]
+        processing_order = init_cond_frames + backbone_out['frames_not_in_init_cond']
 
-        new_idx_per_transition = backbone_out["new_idx_per_transition"]
-        valid_objects_prior_to_each_transition = backbone_out[
-            "valid_objects_prior_to_each_transition"
-        ]
-        transition_points = backbone_out["transition_points"]
+        new_idx_per_transition = backbone_out['new_idx_per_transition']
+        valid_objects_prior_to_each_transition = backbone_out['valid_objects_prior_to_each_transition']
+        transition_points = backbone_out['transition_points']
 
         cond_frame_outputs: dict[int, StageOutput] = {}
         non_cond_frame_outputs: dict[int, StageOutput] = {}
         output_dict = {
-            "cond_frame_outputs": cond_frame_outputs,
-            "non_cond_frame_outputs": non_cond_frame_outputs,
+            'cond_frame_outputs': cond_frame_outputs,
+            'non_cond_frame_outputs': non_cond_frame_outputs,
         }
         multiplex_state = self.multiplex_controller.get_state(
-            backbone_out["gt_masks_per_frame"][processing_order[0]].shape[0],
-            device=backbone_out["gt_masks_per_frame"][processing_order[0]].device,
+            backbone_out['gt_masks_per_frame'][processing_order[0]].shape[0],
+            device=backbone_out['gt_masks_per_frame'][processing_order[0]].device,
             dtype=torch.float,
             random=self.training,
         )
@@ -3566,13 +3235,9 @@ class VideoTrackingDynamicMultiplex(VideoTrackingMultiplex):
             # Get the image features for the current frame
             img_ids = input.find_inputs[stage_id].img_ids
             # The image ids are for the entire batch
-            assert all(
-                [img_id == img_ids[0] for img_id in img_ids]
-            )  # should be all the same
+            assert all([img_id == img_ids[0] for img_id in img_ids])  # should be all the same
             # force this to have a batch size of 1
-            img_ids = torch.tensor(
-                [img_ids[0]], device=img_ids.device, dtype=img_ids.dtype
-            )
+            img_ids = torch.tensor([img_ids[0]], device=img_ids.device, dtype=img_ids.dtype)
 
             if img_feats_already_computed:
                 # Retrieve image features according to img_ids (if they are already computed).
@@ -3581,17 +3246,10 @@ class VideoTrackingDynamicMultiplex(VideoTrackingMultiplex):
                 # pyrefly: ignore [unbound-name]
                 for neck_k, neck_out in backbone_features.items():
                     current_backbone_features[neck_k] = {
-                        "vision_feats": [
-                            x[:, img_ids] for x in neck_out["vision_feats"]
-                        ],
-                        "vision_masks": [
-                            x[img_ids] if x is not None else None
-                            for x in neck_out["vision_masks"]
-                        ],
-                        "vision_pos_embeds": [
-                            x[:, img_ids] for x in neck_out["vision_pos_embeds"]
-                        ],
-                        "feat_sizes": neck_out["feat_sizes"],
+                        'vision_feats': [x[:, img_ids] for x in neck_out['vision_feats']],
+                        'vision_masks': [x[img_ids] if x is not None else None for x in neck_out['vision_masks']],
+                        'vision_pos_embeds': [x[:, img_ids] for x in neck_out['vision_pos_embeds']],
+                        'feat_sizes': neck_out['feat_sizes'],
                     }
             else:
                 # Otherwise, compute the image features on the fly for the given img_ids
@@ -3601,16 +3259,14 @@ class VideoTrackingDynamicMultiplex(VideoTrackingMultiplex):
                     or (stage_id in init_cond_frames)
                     or (stage_id in transition_points)
                 )
-                (current_image, current_backbone_features) = (
-                    self._prepare_backbone_features_per_frame(
-                        input.img_batch,
-                        img_ids,
-                        need_interactive_out=need_interactive_out,
-                        need_propagation_out=True,
-                    )
+                (current_image, current_backbone_features) = self._prepare_backbone_features_per_frame(
+                    input.img_batch,
+                    img_ids,
+                    need_interactive_out=need_interactive_out,
+                    need_propagation_out=True,
                 )
 
-            gt_masks = backbone_out["gt_masks_per_frame"].get(stage_id, None)
+            gt_masks = backbone_out['gt_masks_per_frame'].get(stage_id, None)
             if stage_id in transition_points:
                 assert gt_masks is not None
 
@@ -3618,14 +3274,10 @@ class VideoTrackingDynamicMultiplex(VideoTrackingMultiplex):
                 new_object_idxs = new_idx_per_transition[stage_id]
                 # Get the new object masks, ensure correct ordering
                 assert sorted(new_object_idxs) == new_object_idxs
-                assert new_object_idxs[0] == len(
-                    valid_objects_prior_to_each_transition[stage_id]
-                ), (
-                    f"{new_object_idxs=}; {gt_masks.shape=}; {valid_objects_prior_to_each_transition[stage_id]=}"
+                assert new_object_idxs[0] == len(valid_objects_prior_to_each_transition[stage_id]), (
+                    f'{new_object_idxs=}; {gt_masks.shape=}; {valid_objects_prior_to_each_transition[stage_id]=}'
                 )
-                assert new_object_idxs[-1] == (len(gt_masks) - 1), (
-                    f"{new_object_idxs=}; {gt_masks.shape=}"
-                )
+                assert new_object_idxs[-1] == (len(gt_masks) - 1), f'{new_object_idxs=}; {gt_masks.shape=}'
                 new_object_masks = gt_masks[new_object_idxs]
 
                 # Remove the new objects from the gt masks
@@ -3638,15 +3290,11 @@ class VideoTrackingDynamicMultiplex(VideoTrackingMultiplex):
             current_out = self.track_step(
                 frame_idx=stage_id,
                 is_init_cond_frame=stage_id in init_cond_frames,
-                backbone_features_interactive=current_backbone_features.get(
-                    "interactive"
-                ),
-                backbone_features_propagation=current_backbone_features.get(
-                    "sam2_backbone_out"
-                ),
+                backbone_features_interactive=current_backbone_features.get('interactive'),
+                backbone_features_propagation=current_backbone_features.get('sam2_backbone_out'),
                 image=current_image,
-                point_inputs=backbone_out["point_inputs_per_frame"].get(stage_id, None),
-                mask_inputs=backbone_out["mask_inputs_per_frame"].get(stage_id, None),
+                point_inputs=backbone_out['point_inputs_per_frame'].get(stage_id, None),
+                mask_inputs=backbone_out['mask_inputs_per_frame'].get(stage_id, None),
                 gt_masks=gt_masks,
                 frames_to_add_correction_pt=frames_to_add_correction_pt,
                 output_dict=output_dict,
@@ -3659,43 +3307,36 @@ class VideoTrackingDynamicMultiplex(VideoTrackingMultiplex):
             # Append the output, depending on whether it's a conditioning frame
             add_output_as_cond_frame = (
                 stage_id in init_cond_frames
-                or (
-                    self.add_all_frames_to_correct_as_cond
-                    and stage_id in frames_to_add_correction_pt
-                )
-                or (
-                    self.add_all_transition_frames_as_cond
-                    and stage_id in transition_points
-                )
+                or (self.add_all_frames_to_correct_as_cond and stage_id in frames_to_add_correction_pt)
+                or (self.add_all_transition_frames_as_cond and stage_id in transition_points)
             )
 
             if add_output_as_cond_frame:
-                output_dict["cond_frame_outputs"][stage_id] = current_out
+                output_dict['cond_frame_outputs'][stage_id] = current_out
             else:
-                output_dict["non_cond_frame_outputs"][stage_id] = current_out
+                output_dict['non_cond_frame_outputs'][stage_id] = current_out
 
         # pyre-fixme[6]: For 2nd argument expected `Dict[int, StageOutput]` but got
         #  `MultiplexState`.
-        output_dict["multiplex_state"] = multiplex_state
+        output_dict['multiplex_state'] = multiplex_state
 
         if return_dict:
             return output_dict
         # turn `output_dict` into a list for loss function
         all_frame_outputs = {}
-        all_frame_outputs.update(output_dict["cond_frame_outputs"])
-        all_frame_outputs.update(output_dict["non_cond_frame_outputs"])
+        all_frame_outputs.update(output_dict['cond_frame_outputs'])
+        all_frame_outputs.update(output_dict['non_cond_frame_outputs'])
         if self.is_dynamic_vos_evaluation:
             all_frame_outputs = [all_frame_outputs.get(t) for t in range(num_frames)]
         else:
             all_frame_outputs = [all_frame_outputs[t] for t in range(num_frames)]
         # Make DDP happy with activation checkpointing by removing unused keys
         all_frame_outputs = [
-            {k: v for k, v in d.items() if k != "obj_ptr"} if d is not None else None
-            for d in all_frame_outputs
+            {k: v for k, v in d.items() if k != 'obj_ptr'} if d is not None else None for d in all_frame_outputs
         ]
 
         if self.is_dynamic_vos_evaluation:
-            object_appearance_order = backbone_out["object_appearance_order"]
+            object_appearance_order = backbone_out['object_appearance_order']
             num_objects = len(input.find_metadatas[0].coco_image_id)
 
             # since we have remapped the object appearance order, we would need to map it back here
@@ -3720,7 +3361,7 @@ class VideoTrackingDynamicMultiplex(VideoTrackingMultiplex):
 
             # we need to pad the outputs with zeros (for the frames before the object appears)
             # pyre-fixme[16]: `Optional` has no attribute `__getitem__`.
-            last_mask = all_frame_outputs[-1]["pred_masks"]
+            last_mask = all_frame_outputs[-1]['pred_masks']
 
             # pyrefly: ignore [missing-attribute]
             shape = last_mask.shape[1:]
@@ -3731,20 +3372,16 @@ class VideoTrackingDynamicMultiplex(VideoTrackingMultiplex):
             for stage_i, frame_out in enumerate(all_frame_outputs):
                 if frame_out is None:
                     all_frame_outputs[stage_i] = {
-                        "pred_masks": torch.zeros(
-                            (num_objects, *shape), device=device, dtype=dtype
-                        )
+                        'pred_masks': torch.zeros((num_objects, *shape), device=device, dtype=dtype)
                     }
                     continue
 
-                pred_mask = frame_out["pred_masks"]
+                pred_mask = frame_out['pred_masks']
                 # pyrefly: ignore [missing-attribute]
                 if pred_mask.shape[0] < num_objects:
                     # pyrefly: ignore [missing-attribute]
-                    shape = pred_mask.shape[
-                        1:
-                    ]  # might have a different shape, e.g., input mask
-                    frame_out["pred_masks"] = torch.cat(
+                    shape = pred_mask.shape[1:]  # might have a different shape, e.g., input mask
+                    frame_out['pred_masks'] = torch.cat(
                         # pyrefly: ignore [bad-argument-type]
                         [
                             pred_mask,

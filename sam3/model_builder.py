@@ -85,7 +85,7 @@ def _create_vit_backbone(compile_mode=None, use_fa3=False, use_rope_real=False):
         depth=32,
         num_heads=16,
         mlp_ratio=4.625,
-        norm_layer="LayerNorm",
+        norm_layer='LayerNorm',
         drop_path_rate=0.1,
         qkv_bias=True,
         use_abs_pos=True,
@@ -126,7 +126,7 @@ def _create_vl_backbone(vit_neck, text_encoder):
 def _create_transformer_encoder(use_fa3=False) -> TransformerEncoderFusion:
     """Create transformer encoder with its layer."""
     encoder_layer = TransformerEncoderLayer(
-        activation="relu",
+        activation='relu',
         d_model=256,
         dim_feedforward=2048,
         dropout=0.1,
@@ -166,7 +166,7 @@ def _create_transformer_encoder(use_fa3=False) -> TransformerEncoderFusion:
 def _create_transformer_decoder(use_fa3=False) -> TransformerDecoder:
     """Create transformer decoder with its layer."""
     decoder_layer = TransformerDecoderLayer(
-        activation="relu",
+        activation='relu',
         d_model=256,
         dim_feedforward=2048,
         dropout=0.1,
@@ -188,7 +188,7 @@ def _create_transformer_decoder(use_fa3=False) -> TransformerDecoder:
         box_refine=True,
         num_o2m_queries=0,
         dac=True,
-        boxRPB="log",
+        boxRPB='log',
         d_model=256,
         frozen=False,
         interaction_layer=None,
@@ -219,7 +219,7 @@ def _create_segmentation_head(compile_mode=None, use_fa3=False):
     """Create segmentation head with pixel decoder."""
     pixel_decoder = PixelDecoder(
         num_upsampling_stages=3,
-        interpolation_mode="nearest",
+        interpolation_mode='nearest',
         hidden_dim=256,
         compile_mode=compile_mode,
     )
@@ -258,7 +258,7 @@ def _create_geometry_encoder():
     )
     # Create geometry encoder layer
     geo_layer = TransformerEncoderLayer(
-        activation="relu",
+        activation='relu',
         d_model=256,
         dim_feedforward=2048,
         dropout=0.1,
@@ -311,16 +311,16 @@ def _create_sam3_model(
 ):
     """Create the SAM3 image model."""
     common_params = {
-        "backbone": backbone,
-        "transformer": transformer,
-        "input_geometry_encoder": input_geometry_encoder,
-        "segmentation_head": segmentation_head,
-        "num_feature_levels": 1,
-        "o2m_mask_predict": True,
-        "dot_prod_scoring": dot_prod_scoring,
-        "use_instance_query": False,
-        "multimask_output": True,
-        "inst_interactive_predictor": inst_interactive_predictor,
+        'backbone': backbone,
+        'transformer': transformer,
+        'input_geometry_encoder': input_geometry_encoder,
+        'segmentation_head': segmentation_head,
+        'num_feature_levels': 1,
+        'o2m_mask_predict': True,
+        'dot_prod_scoring': dot_prod_scoring,
+        'use_instance_query': False,
+        'multimask_output': True,
+        'inst_interactive_predictor': inst_interactive_predictor,
     }
 
     matcher = None
@@ -336,7 +336,7 @@ def _create_sam3_model(
             gamma=2,
             stable=False,
         )
-    common_params["matcher"] = matcher
+    common_params['matcher'] = matcher
     model = Sam3Image(**common_params)
 
     return model
@@ -354,9 +354,7 @@ def _create_tracker_maskmem_backbone():
     )
 
     # Mask processing components
-    mask_downsampler = SimpleMaskDownSampler(
-        kernel_size=3, stride=2, padding=1, interpol_size=[1152, 1152]
-    )
+    mask_downsampler = SimpleMaskDownSampler(kernel_size=3, stride=2, padding=1, interpol_size=[1152, 1152])
 
     cx_block_layer = CXBlock(
         dim=256,
@@ -409,7 +407,7 @@ def _create_tracker_transformer():
     # Encoder layer
     encoder_layer = TransformerDecoderLayerv2(
         cross_attention_first=False,
-        activation="relu",
+        activation='relu',
         dim_feedforward=2048,
         dropout=0.1,
         pos_enc_at_attn=False,
@@ -486,9 +484,9 @@ def build_tracker(
         offload_output_to_cpu_for_eval=False,
         # SAM decoder settings
         sam_mask_decoder_extra_args={
-            "dynamic_multimask_via_stability": True,
-            "dynamic_multimask_stability_delta": 0.05,
-            "dynamic_multimask_stability_thresh": 0.98,
+            'dynamic_multimask_via_stability': True,
+            'dynamic_multimask_stability_delta': 0.05,
+            'dynamic_multimask_stability_thresh': 0.98,
         },
         clear_non_cond_mem_around_input=True,
         fill_hole_area=0,
@@ -510,9 +508,7 @@ def _create_text_encoder(bpe_path: str) -> VETextEncoder:
     )
 
 
-def _create_vision_backbone(
-    compile_mode=None, enable_inst_interactivity=True
-) -> Sam3DualViTDetNeck:
+def _create_vision_backbone(compile_mode=None, enable_inst_interactivity=True) -> Sam3DualViTDetNeck:
     """Create SAM3 visual backbone with ViT and neck."""
     # Position encoding
     position_encoding = _create_position_encoding(precompute_resolution=1008)
@@ -527,9 +523,7 @@ def _create_vision_backbone(
     return vit_neck
 
 
-def _create_sam3_transformer(
-    has_presence_token: bool = True, use_fa3: bool = False
-) -> TransformerWrapper:
+def _create_sam3_transformer(has_presence_token: bool = True, use_fa3: bool = False) -> TransformerWrapper:
     """Create SAM3 transformer encoder and decoder."""
     encoder: TransformerEncoderFusion = _create_transformer_encoder(use_fa3=use_fa3)
     decoder: TransformerDecoder = _create_transformer_decoder(use_fa3=use_fa3)
@@ -539,32 +533,23 @@ def _create_sam3_transformer(
 
 def _load_checkpoint(model, checkpoint_path):
     """Load model checkpoint from file."""
-    with g_pathmgr.open(checkpoint_path, "rb") as f:
-        ckpt = torch.load(f, map_location="cpu", weights_only=True)
-    if "model" in ckpt and isinstance(ckpt["model"], dict):
-        ckpt = ckpt["model"]
-    sam3_image_ckpt = {
-        k.replace("detector.", ""): v for k, v in ckpt.items() if "detector" in k
-    }
+    with g_pathmgr.open(checkpoint_path, 'rb') as f:
+        ckpt = torch.load(f, map_location='cpu', weights_only=True)
+    if 'model' in ckpt and isinstance(ckpt['model'], dict):
+        ckpt = ckpt['model']
+    sam3_image_ckpt = {k.replace('detector.', ''): v for k, v in ckpt.items() if 'detector' in k}
     if model.inst_interactive_predictor is not None:
         sam3_image_ckpt.update(
-            {
-                k.replace("tracker.", "inst_interactive_predictor.model."): v
-                for k, v in ckpt.items()
-                if "tracker" in k
-            }
+            {k.replace('tracker.', 'inst_interactive_predictor.model.'): v for k, v in ckpt.items() if 'tracker' in k}
         )
     missing_keys, _ = model.load_state_dict(sam3_image_ckpt, strict=False)
     if len(missing_keys) > 0:
-        print(
-            f"loaded {checkpoint_path} and found "
-            f"missing and/or unexpected keys:\n{missing_keys=}"
-        )
+        print(f'loaded {checkpoint_path} and found missing and/or unexpected keys:\n{missing_keys=}')
 
 
 def _setup_device_and_mode(model, device, eval_mode):
     """Setup model device and evaluation mode."""
-    if device == "cuda":
+    if device == 'cuda':
         model = model.cuda()
     if eval_mode:
         model.eval()
@@ -573,7 +558,7 @@ def _setup_device_and_mode(model, device, eval_mode):
 
 def build_sam3_image_model(
     bpe_path=None,
-    device="cuda" if torch.cuda.is_available() else "cpu",
+    device='cuda' if torch.cuda.is_available() else 'cpu',
     eval_mode=True,
     checkpoint_path=None,
     load_from_HF=True,
@@ -597,10 +582,10 @@ def build_sam3_image_model(
         A SAM3 image model
     """
     if bpe_path is None:
-        bpe_path = str(files("sam3").joinpath("assets/bpe_simple_vocab_16e6.txt.gz"))
+        bpe_path = str(files('sam3').joinpath('assets/bpe_simple_vocab_16e6.txt.gz'))
 
     # Create visual components
-    compile_mode = "default" if compile else None
+    compile_mode = 'default' if compile else None
     vision_encoder = _create_vision_backbone(
         compile_mode=compile_mode, enable_inst_interactivity=enable_inst_interactivity
     )
@@ -618,11 +603,7 @@ def build_sam3_image_model(
     dot_prod_scoring = _create_dot_product_scoring()
 
     # Create segmentation head if enabled
-    segmentation_head = (
-        _create_segmentation_head(compile_mode=compile_mode)
-        if enable_segmentation
-        else None
-    )
+    segmentation_head = _create_segmentation_head(compile_mode=compile_mode) if enable_segmentation else None
 
     # Create geometry encoder
     input_geometry_encoder = _create_geometry_encoder()
@@ -642,7 +623,7 @@ def build_sam3_image_model(
         eval_mode,
     )
     if load_from_HF and checkpoint_path is None:
-        checkpoint_path = download_ckpt_from_hf(version="sam3")
+        checkpoint_path = download_ckpt_from_hf(version='sam3')
     # Load checkpoint if provided
     if checkpoint_path is not None:
         _load_checkpoint(model, checkpoint_path)
@@ -653,20 +634,20 @@ def build_sam3_image_model(
     return model
 
 
-def download_ckpt_from_hf(version="sam3"):
+def download_ckpt_from_hf(version='sam3'):
     """Download model checkpoint from HuggingFace Hub.
 
     Args:
         version: "sam3" or "sam3.1"
     """
-    if version == "sam3.1":
-        repo_id = "facebook/sam3.1"
-        ckpt_name = "sam3.1_multiplex.pt"
-        cfg_name = "config.json"
+    if version == 'sam3.1':
+        repo_id = 'facebook/sam3.1'
+        ckpt_name = 'sam3.1_multiplex.pt'
+        cfg_name = 'config.json'
     else:
-        repo_id = "facebook/sam3"
-        ckpt_name = "sam3.pt"
-        cfg_name = "config.json"
+        repo_id = 'facebook/sam3'
+        ckpt_name = 'sam3.pt'
+        cfg_name = 'config.json'
     _ = hf_hub_download(repo_id=repo_id, filename=cfg_name)
     checkpoint_path = hf_hub_download(repo_id=repo_id, filename=ckpt_name)
     return checkpoint_path
@@ -680,7 +661,7 @@ def build_sam3_video_model(
     geo_encoder_use_img_cross_attn: bool = True,
     strict_state_dict_loading: bool = True,
     apply_temporal_disambiguation: bool = True,
-    device="cuda" if torch.cuda.is_available() else "cpu",
+    device='cuda' if torch.cuda.is_available() else 'cpu',
     compile=False,
 ) -> Sam3VideoInferenceWithInstanceInteractivity:
     """
@@ -694,9 +675,7 @@ def build_sam3_video_model(
         Sam3VideoInferenceWithInstanceInteractivity: The instantiated dense tracking model
     """
     if bpe_path is None:
-        bpe_path = pkg_resources.resource_filename(
-            "sam3", "assets/bpe_simple_vocab_16e6.txt.gz"
-        )
+        bpe_path = pkg_resources.resource_filename('sam3', 'assets/bpe_simple_vocab_16e6.txt.gz')
 
     # Build Tracker module
     tracker = build_tracker(apply_temporal_disambiguation=apply_temporal_disambiguation)
@@ -719,9 +698,7 @@ def build_sam3_video_model(
         residual=True,
         out_norm=nn.LayerNorm(256),
     )
-    main_dot_prod_scoring = DotProductScoring(
-        d_model=256, d_proj=256, prompt_mlp=main_dot_prod_mlp
-    )
+    main_dot_prod_scoring = DotProductScoring(d_model=256, d_proj=256, prompt_mlp=main_dot_prod_mlp)
 
     # Build Detector module
     detector = Sam3ImageOnVideoMultiGPU(
@@ -794,29 +771,25 @@ def build_sam3_video_model(
 
     # Load checkpoint if provided
     if load_from_HF and checkpoint_path is None:
-        checkpoint_path = download_ckpt_from_hf(version="sam3")
+        checkpoint_path = download_ckpt_from_hf(version='sam3')
     if checkpoint_path is not None:
-        with g_pathmgr.open(checkpoint_path, "rb") as f:
-            ckpt = torch.load(f, map_location="cpu", weights_only=True)
-        if "model" in ckpt and isinstance(ckpt["model"], dict):
-            ckpt = ckpt["model"]
+        with g_pathmgr.open(checkpoint_path, 'rb') as f:
+            ckpt = torch.load(f, map_location='cpu', weights_only=True)
+        if 'model' in ckpt and isinstance(ckpt['model'], dict):
+            ckpt = ckpt['model']
 
-        missing_keys, unexpected_keys = model.load_state_dict(
-            ckpt, strict=strict_state_dict_loading
-        )
+        missing_keys, unexpected_keys = model.load_state_dict(ckpt, strict=strict_state_dict_loading)
         if missing_keys:
-            print(f"Missing keys: {missing_keys}")
+            print(f'Missing keys: {missing_keys}')
         if unexpected_keys:
-            print(f"Unexpected keys: {unexpected_keys}")
+            print(f'Unexpected keys: {unexpected_keys}')
 
     model.to(device=device)
     return model
 
 
 def build_sam3_video_predictor(*model_args, gpus_to_use=None, **model_kwargs):
-    return Sam3VideoPredictorMultiGPU(
-        *model_args, gpus_to_use=gpus_to_use, **model_kwargs
-    )
+    return Sam3VideoPredictorMultiGPU(*model_args, gpus_to_use=gpus_to_use, **model_kwargs)
 
 
 def _create_multiplex_maskmem_backbone(multiplex_count=16):
@@ -883,7 +856,7 @@ def _create_multiplex_transformer(use_fa3=False, use_rope_real=False):
     )
 
     encoder_layer = DecoupledTransformerDecoderLayerv2(
-        activation="gelu",
+        activation='gelu',
         d_model=256,
         num_heads=8,
         dropout=0.1,
@@ -916,14 +889,10 @@ def _create_multiplex_transformer(use_fa3=False, use_rope_real=False):
     return transformer
 
 
-def _create_multiplex_tri_backbone(
-    compile_mode=None, use_fa3=False, use_rope_real=False
-):
+def _create_multiplex_tri_backbone(compile_mode=None, use_fa3=False, use_rope_real=False):
     """Create the TriHead vision backbone for multiplex model."""
     position_encoding = _create_position_encoding(precompute_resolution=1008)
-    vit_backbone = _create_vit_backbone(
-        compile_mode=compile_mode, use_fa3=use_fa3, use_rope_real=use_rope_real
-    )
+    vit_backbone = _create_vit_backbone(compile_mode=compile_mode, use_fa3=use_fa3, use_rope_real=use_rope_real)
     tri_neck = Sam3TriViTDetNeck(
         trunk=vit_backbone,
         position_encoding=position_encoding,
@@ -940,7 +909,7 @@ def build_sam3_multiplex_video_model(
     use_fa3: bool = False,
     use_rope_real: bool = False,
     strict_state_dict_loading: bool = True,
-    device="cuda" if torch.cuda.is_available() else "cpu",
+    device='cuda' if torch.cuda.is_available() else 'cpu',
     compile=False,
 ):
     """
@@ -959,15 +928,9 @@ def build_sam3_multiplex_video_model(
         VideoTrackingDynamicMultiplex: The instantiated multiplex tracking model
     """
     # Build multiplex-specific components
-    maskmem_backbone = _create_multiplex_maskmem_backbone(
-        multiplex_count=multiplex_count
-    )
-    transformer = _create_multiplex_transformer(
-        use_fa3=use_fa3, use_rope_real=use_rope_real
-    )
-    tri_neck = _create_multiplex_tri_backbone(
-        compile_mode="max-autotune" if compile else None
-    )
+    maskmem_backbone = _create_multiplex_maskmem_backbone(multiplex_count=multiplex_count)
+    transformer = _create_multiplex_transformer(use_fa3=use_fa3, use_rope_real=use_rope_real)
+    tri_neck = _create_multiplex_tri_backbone(compile_mode='max-autotune' if compile else None)
     backbone = TriHeadVisionOnly(
         visual=tri_neck,
         n_features=256,
@@ -1037,9 +1000,9 @@ def build_sam3_multiplex_video_model(
         is_dynamic_model=True,
         # SAM mask decoder extra args
         sam_mask_decoder_extra_args={
-            "dynamic_multimask_via_stability": True,
-            "dynamic_multimask_stability_delta": 0.05,
-            "dynamic_multimask_stability_thresh": 0.98,
+            'dynamic_multimask_via_stability': True,
+            'dynamic_multimask_stability_delta': 0.05,
+            'dynamic_multimask_stability_thresh': 0.98,
         },
         compile_all_components=compile,
         use_memory_selection=False,
@@ -1047,20 +1010,18 @@ def build_sam3_multiplex_video_model(
 
     # Load checkpoint if provided
     if load_from_HF and checkpoint_path is None:
-        checkpoint_path = download_ckpt_from_hf(version="sam3.1")
+        checkpoint_path = download_ckpt_from_hf(version='sam3.1')
     if checkpoint_path is not None:
-        with g_pathmgr.open(checkpoint_path, "rb") as f:
-            ckpt = torch.load(f, map_location="cpu", weights_only=True)
-        if "model" in ckpt and isinstance(ckpt["model"], dict):
-            ckpt = ckpt["model"]
+        with g_pathmgr.open(checkpoint_path, 'rb') as f:
+            ckpt = torch.load(f, map_location='cpu', weights_only=True)
+        if 'model' in ckpt and isinstance(ckpt['model'], dict):
+            ckpt = ckpt['model']
 
-        missing_keys, unexpected_keys = model.load_state_dict(
-            ckpt, strict=strict_state_dict_loading
-        )
+        missing_keys, unexpected_keys = model.load_state_dict(ckpt, strict=strict_state_dict_loading)
         if missing_keys:
-            print(f"Missing keys: {missing_keys}")
+            print(f'Missing keys: {missing_keys}')
         if unexpected_keys:
-            print(f"Unexpected keys: {unexpected_keys}")
+            print(f'Unexpected keys: {unexpected_keys}')
 
     model.to(device=device)
     return model
@@ -1104,9 +1065,7 @@ def build_sam3_multiplex_video_predictor(
         Sam3MultiplexVideoPredictor: The fully-initialized predictor
     """
     if bpe_path is None:
-        bpe_path = pkg_resources.resource_filename(
-            "sam3", "assets/bpe_simple_vocab_16e6.txt.gz"
-        )
+        bpe_path = pkg_resources.resource_filename('sam3', 'assets/bpe_simple_vocab_16e6.txt.gz')
 
     from sam3.model.sam3_multiplex_base import Sam3MultiplexPredictorWrapper
     from sam3.model.sam3_multiplex_detector import Sam3MultiplexDetector
@@ -1138,9 +1097,7 @@ def build_sam3_multiplex_video_predictor(
     )
 
     # Build detector
-    tri_neck = _create_multiplex_tri_backbone(
-        compile_mode=None, use_fa3=use_fa3, use_rope_real=use_rope_real
-    )
+    tri_neck = _create_multiplex_tri_backbone(compile_mode=None, use_fa3=use_fa3, use_rope_real=use_rope_real)
     text_encoder = _create_text_encoder(bpe_path)
     backbone = SAM3VLBackboneTri(scalp=0, visual=tri_neck, text=text_encoder)
     transformer = _create_sam3_transformer(use_fa3=use_fa3)
@@ -1199,33 +1156,29 @@ def build_sam3_multiplex_video_predictor(
 
     # Load checkpoint (auto-download from HuggingFace if not provided)
     if checkpoint_path is None:
-        checkpoint_path = download_ckpt_from_hf(version="sam3.1")
+        checkpoint_path = download_ckpt_from_hf(version='sam3.1')
     if checkpoint_path is not None:
-        ckpt = torch.load(checkpoint_path, map_location="cpu", weights_only=True)
-        if "model" in ckpt and isinstance(ckpt["model"], dict):
-            ckpt = ckpt["model"]
+        ckpt = torch.load(checkpoint_path, map_location='cpu', weights_only=True)
+        if 'model' in ckpt and isinstance(ckpt['model'], dict):
+            ckpt = ckpt['model']
         # Remap checkpoint keys if needed (internal naming -> OSS naming)
         # HF checkpoints are already remapped; local checkpoints may use old naming
-        needs_remap = any(
-            k.startswith("sam3_model.") or k.startswith("sam2_predictor.") for k in ckpt
-        )
+        needs_remap = any(k.startswith('sam3_model.') or k.startswith('sam2_predictor.') for k in ckpt)
         if needs_remap:
             remapped_ckpt = {}
             for k, v in ckpt.items():
                 new_k = k
-                if k.startswith("sam3_model."):
-                    new_k = "detector." + k[len("sam3_model.") :]
-                elif k.startswith("sam2_predictor."):
-                    new_k = "tracker." + k[len("sam2_predictor.") :]
+                if k.startswith('sam3_model.'):
+                    new_k = 'detector.' + k[len('sam3_model.') :]
+                elif k.startswith('sam2_predictor.'):
+                    new_k = 'tracker.' + k[len('sam2_predictor.') :]
                 remapped_ckpt[new_k] = v
             ckpt = remapped_ckpt
         missing_keys, unexpected_keys = demo_model.load_state_dict(ckpt, strict=False)
         if missing_keys:
-            print(f"Missing keys ({len(missing_keys)}): {missing_keys[:10]}...")
+            print(f'Missing keys ({len(missing_keys)}): {missing_keys[:10]}...')
         if unexpected_keys:
-            print(
-                f"Unexpected keys ({len(unexpected_keys)}): {unexpected_keys[:10]}..."
-            )
+            print(f'Unexpected keys ({len(unexpected_keys)}): {unexpected_keys[:10]}...')
 
     demo_model.cuda().eval()
 
@@ -1243,7 +1196,7 @@ def build_sam3_multiplex_video_predictor(
 def build_sam3_predictor(
     checkpoint_path: Optional[str] = None,
     bpe_path: Optional[str] = None,
-    version: str = "sam3.1",  # "sam3" or "sam3.1"
+    version: str = 'sam3.1',  # "sam3" or "sam3.1"
     compile: bool = False,
     warm_up: bool = False,
     # SAM 3.1 specific
@@ -1293,7 +1246,7 @@ def build_sam3_predictor(
         for out in predictor.handle_stream_request({"type": "propagate_in_video", "session_id": session_id}):
             masks = out["out_binary_masks"]
     """
-    if version == "sam3.1":
+    if version == 'sam3.1':
         return build_sam3_multiplex_video_predictor(
             checkpoint_path=checkpoint_path,
             bpe_path=bpe_path,
@@ -1306,7 +1259,7 @@ def build_sam3_predictor(
             async_loading_frames=async_loading_frames,
             **kwargs,
         )
-    elif version == "sam3":
+    elif version == 'sam3':
         return build_sam3_video_predictor(
             checkpoint_path=checkpoint_path,
             bpe_path=bpe_path,

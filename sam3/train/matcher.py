@@ -59,9 +59,7 @@ class HungarianMatcher(nn.Module):
         self.cost_bbox = cost_bbox
         self.cost_giou = cost_giou
         self.norm = nn.Sigmoid() if focal_loss else nn.Softmax(-1)
-        assert cost_class != 0 or cost_bbox != 0 or cost_giou != 0, (
-            "all costs cant be 0"
-        )
+        assert cost_class != 0 or cost_bbox != 0 or cost_giou != 0, 'all costs cant be 0'
         self.focal_loss = focal_loss
         self.focal_alpha = focal_alpha
         self.focal_gamma = focal_gamma
@@ -87,55 +85,40 @@ class HungarianMatcher(nn.Module):
             For each batch element, it holds:
                 len(index_i) = len(index_j) = min(num_queries, num_target_boxes)
         """
-        bs, num_queries = outputs["pred_logits"].shape[:2]
+        bs, num_queries = outputs['pred_logits'].shape[:2]
 
         # We flatten to compute the cost matrices in a batch
-        out_prob = self.norm(
-            outputs["pred_logits"].flatten(0, 1)
-        )  # [batch_size * num_queries, num_classes]
-        out_bbox = outputs["pred_boxes"].flatten(0, 1)  # [batch_size * num_queries, 4]
+        out_prob = self.norm(outputs['pred_logits'].flatten(0, 1))  # [batch_size * num_queries, num_classes]
+        out_bbox = outputs['pred_boxes'].flatten(0, 1)  # [batch_size * num_queries, 4]
 
         # Also concat the target labels and boxes
-        tgt_bbox = batched_targets["boxes"]
+        tgt_bbox = batched_targets['boxes']
 
-        if "positive_map" in batched_targets:
+        if 'positive_map' in batched_targets:
             # In this case we have a multi-hot target
-            positive_map = batched_targets["positive_map"]
+            positive_map = batched_targets['positive_map']
             assert len(tgt_bbox) == len(positive_map)
 
             if self.focal_loss:
                 positive_map = positive_map > 1e-4
                 alpha = self.focal_alpha
                 gamma = self.focal_gamma
-                neg_cost_class = (
-                    (1 - alpha) * (out_prob**gamma) * (-(1 - out_prob + 1e-8).log())
-                )
-                pos_cost_class = (
-                    alpha * ((1 - out_prob) ** gamma) * (-(out_prob + 1e-8).log())
-                )
-                cost_class = (
-                    (pos_cost_class - neg_cost_class).unsqueeze(1)
-                    * positive_map.unsqueeze(0)
-                ).sum(-1)
+                neg_cost_class = (1 - alpha) * (out_prob**gamma) * (-(1 - out_prob + 1e-8).log())
+                pos_cost_class = alpha * ((1 - out_prob) ** gamma) * (-(out_prob + 1e-8).log())
+                cost_class = ((pos_cost_class - neg_cost_class).unsqueeze(1) * positive_map.unsqueeze(0)).sum(-1)
             else:
                 # Compute the soft-cross entropy between the predicted token alignment and the GT one for each box
-                cost_class = -(out_prob.unsqueeze(1) * positive_map.unsqueeze(0)).sum(
-                    -1
-                )
+                cost_class = -(out_prob.unsqueeze(1) * positive_map.unsqueeze(0)).sum(-1)
         else:
             # In this case we are doing a "standard" cross entropy
-            tgt_ids = batched_targets["labels"]
+            tgt_ids = batched_targets['labels']
             assert len(tgt_bbox) == len(tgt_ids)
 
             if self.focal_loss:
                 alpha = self.focal_alpha
                 gamma = self.focal_gamma
-                neg_cost_class = (
-                    (1 - alpha) * (out_prob**gamma) * (-(1 - out_prob + 1e-8).log())
-                )
-                pos_cost_class = (
-                    alpha * ((1 - out_prob) ** gamma) * (-(out_prob + 1e-8).log())
-                )
+                neg_cost_class = (1 - alpha) * (out_prob**gamma) * (-(1 - out_prob + 1e-8).log())
+                pos_cost_class = alpha * ((1 - out_prob) ** gamma) * (-(out_prob + 1e-8).log())
                 cost_class = pos_cost_class[:, tgt_ids] - neg_cost_class[:, tgt_ids]
             else:
                 # Compute the classification cost. Contrary to the loss, we don't use the NLL,
@@ -148,24 +131,16 @@ class HungarianMatcher(nn.Module):
         assert cost_class.shape == cost_bbox.shape
 
         # Compute the giou cost betwen boxes
-        cost_giou = -generalized_box_iou(
-            box_cxcywh_to_xyxy(out_bbox), box_cxcywh_to_xyxy(tgt_bbox)
-        )
+        cost_giou = -generalized_box_iou(box_cxcywh_to_xyxy(out_bbox), box_cxcywh_to_xyxy(tgt_bbox))
 
         # Final cost matrix
-        C = (
-            self.cost_bbox * cost_bbox
-            + self.cost_class * cost_class
-            + self.cost_giou * cost_giou
-        )
+        C = self.cost_bbox * cost_bbox + self.cost_class * cost_class + self.cost_giou * cost_giou
         C = C.view(bs, num_queries, -1).cpu().numpy()
 
-        sizes = torch.cumsum(batched_targets["num_boxes"], -1)[:-1]
+        sizes = torch.cumsum(batched_targets['num_boxes'], -1)[:-1]
         costs = [c[i] for i, c in enumerate(np.split(C, sizes.cpu().numpy(), axis=-1))]
         indices = [_do_matching(c) for c in costs]
-        batch_idx = torch.as_tensor(
-            sum([[i] * len(src) for i, src in enumerate(indices)], []), dtype=torch.long
-        )
+        batch_idx = torch.as_tensor(sum([[i] * len(src) for i, src in enumerate(indices)], []), dtype=torch.long)
         src_idx = torch.from_numpy(np.concatenate(indices)).long()
         return batch_idx, src_idx
 
@@ -196,9 +171,7 @@ class BinaryHungarianMatcher(nn.Module):
         self.cost_bbox = cost_bbox
         self.cost_giou = cost_giou
         self.norm = nn.Sigmoid()
-        assert cost_class != 0 or cost_bbox != 0 or cost_giou != 0, (
-            "all costs cant be 0"
-        )
+        assert cost_class != 0 or cost_bbox != 0 or cost_giou != 0, 'all costs cant be 0'
 
     @torch.no_grad()
     def forward(self, outputs, batched_targets, repeats=0, repeat_batch=1):
@@ -222,18 +195,16 @@ class BinaryHungarianMatcher(nn.Module):
                 len(index_i) = len(index_j) = min(num_queries, num_target_boxes)
         """
         if repeat_batch != 1:
-            raise NotImplementedError("please use BinaryHungarianMatcherV2 instead")
+            raise NotImplementedError('please use BinaryHungarianMatcherV2 instead')
 
-        bs, num_queries = outputs["pred_logits"].shape[:2]
+        bs, num_queries = outputs['pred_logits'].shape[:2]
 
         # We flatten to compute the cost matrices in a batch
-        out_prob = self.norm(outputs["pred_logits"].flatten(0, 1)).squeeze(
-            -1
-        )  # [batch_size * num_queries]
-        out_bbox = outputs["pred_boxes"].flatten(0, 1)  # [batch_size * num_queries, 4]
+        out_prob = self.norm(outputs['pred_logits'].flatten(0, 1)).squeeze(-1)  # [batch_size * num_queries]
+        out_bbox = outputs['pred_boxes'].flatten(0, 1)  # [batch_size * num_queries, 4]
 
         # Also concat the target labels and boxes
-        tgt_bbox = batched_targets["boxes"]
+        tgt_bbox = batched_targets['boxes']
 
         # Compute the L1 cost between boxes
         cost_bbox = torch.cdist(out_bbox, tgt_bbox, p=1)
@@ -243,19 +214,13 @@ class BinaryHungarianMatcher(nn.Module):
         assert cost_class.shape == cost_bbox.shape
 
         # Compute the giou cost betwen boxes
-        cost_giou = -generalized_box_iou(
-            box_cxcywh_to_xyxy(out_bbox), box_cxcywh_to_xyxy(tgt_bbox)
-        )
+        cost_giou = -generalized_box_iou(box_cxcywh_to_xyxy(out_bbox), box_cxcywh_to_xyxy(tgt_bbox))
 
         # Final cost matrix
-        C = (
-            self.cost_bbox * cost_bbox
-            + self.cost_class * cost_class
-            + self.cost_giou * cost_giou
-        )
+        C = self.cost_bbox * cost_bbox + self.cost_class * cost_class + self.cost_giou * cost_giou
         C = C.view(bs, num_queries, -1).cpu().numpy()
 
-        sizes = torch.cumsum(batched_targets["num_boxes"], -1)[:-1]
+        sizes = torch.cumsum(batched_targets['num_boxes'], -1)[:-1]
         costs = [c[i] for i, c in enumerate(np.split(C, sizes.cpu().numpy(), axis=-1))]
         return_tgt_indices = False
         for c in costs:
@@ -267,12 +232,7 @@ class BinaryHungarianMatcher(nn.Module):
                 break
         if return_tgt_indices:
             indices, tgt_indices = zip(
-                *(
-                    _do_matching(
-                        c, repeats=repeats, return_tgt_indices=return_tgt_indices
-                    )
-                    for c in costs
-                )
+                *(_do_matching(c, repeats=repeats, return_tgt_indices=return_tgt_indices) for c in costs)
             )
             tgt_indices = list(tgt_indices)
             for i in range(1, len(tgt_indices)):
@@ -282,9 +242,7 @@ class BinaryHungarianMatcher(nn.Module):
             indices = [_do_matching(c, repeats=repeats) for c in costs]
             tgt_idx = None
 
-        batch_idx = torch.as_tensor(
-            sum([[i] * len(src) for i, src in enumerate(indices)], []), dtype=torch.long
-        )
+        batch_idx = torch.as_tensor(sum([[i] * len(src) for i, src in enumerate(indices)], []), dtype=torch.long)
         src_idx = torch.from_numpy(np.concatenate(indices)).long()
         return batch_idx, src_idx, tgt_idx
 
@@ -321,9 +279,7 @@ class BinaryFocalHungarianMatcher(nn.Module):
         self.alpha = alpha
         self.gamma = gamma
         self.stable = stable
-        assert cost_class != 0 or cost_bbox != 0 or cost_giou != 0, (
-            "all costs cant be 0"
-        )
+        assert cost_class != 0 or cost_bbox != 0 or cost_giou != 0, 'all costs cant be 0'
 
     @torch.no_grad()
     def forward(self, outputs, batched_targets, repeats=1, repeat_batch=1):
@@ -347,33 +303,31 @@ class BinaryFocalHungarianMatcher(nn.Module):
                 len(index_i) = len(index_j) = min(num_queries, num_target_boxes)
         """
         if repeat_batch != 1:
-            raise NotImplementedError("please use BinaryHungarianMatcherV2 instead")
+            raise NotImplementedError('please use BinaryHungarianMatcherV2 instead')
 
-        bs, num_queries = outputs["pred_logits"].shape[:2]
+        bs, num_queries = outputs['pred_logits'].shape[:2]
 
         # We flatten to compute the cost matrices in a batch
-        out_score = outputs["pred_logits"].flatten(0, 1).squeeze(-1)
+        out_score = outputs['pred_logits'].flatten(0, 1).squeeze(-1)
         out_prob = self.norm(out_score)  # [batch_size * num_queries]
-        out_bbox = outputs["pred_boxes"].flatten(0, 1)  # [batch_size * num_queries, 4]
+        out_bbox = outputs['pred_boxes'].flatten(0, 1)  # [batch_size * num_queries, 4]
 
         # Also concat the target labels and boxes
-        tgt_bbox = batched_targets["boxes"]
+        tgt_bbox = batched_targets['boxes']
 
         # Compute the L1 cost between boxes
         cost_bbox = torch.cdist(out_bbox, tgt_bbox, p=1)
 
         # Compute the giou cost betwen boxes
-        cost_giou = -generalized_box_iou(
-            box_cxcywh_to_xyxy(out_bbox), box_cxcywh_to_xyxy(tgt_bbox)
-        )
+        cost_giou = -generalized_box_iou(box_cxcywh_to_xyxy(out_bbox), box_cxcywh_to_xyxy(tgt_bbox))
 
         # cost_class = -out_prob.unsqueeze(-1).expand_as(cost_bbox)
         if self.stable:
             rescaled_giou = (-cost_giou + 1) / 2
             out_prob = out_prob.unsqueeze(-1).expand_as(cost_bbox) * rescaled_giou
-            cost_class = -self.alpha * (1 - out_prob) ** self.gamma * torch.log(
-                out_prob
-            ) + (1 - self.alpha) * out_prob**self.gamma * torch.log(1 - out_prob)
+            cost_class = -self.alpha * (1 - out_prob) ** self.gamma * torch.log(out_prob) + (
+                1 - self.alpha
+            ) * out_prob**self.gamma * torch.log(1 - out_prob)
         else:
             # directly computing log sigmoid (more numerically stable)
             log_out_prob = torch.nn.functional.logsigmoid(out_score)
@@ -388,14 +342,10 @@ class BinaryFocalHungarianMatcher(nn.Module):
         assert cost_class.shape == cost_bbox.shape
 
         # Final cost matrix
-        C = (
-            self.cost_bbox * cost_bbox
-            + self.cost_class * cost_class
-            + self.cost_giou * cost_giou
-        )
+        C = self.cost_bbox * cost_bbox + self.cost_class * cost_class + self.cost_giou * cost_giou
         C = C.view(bs, num_queries, -1).cpu().numpy()
 
-        sizes = torch.cumsum(batched_targets["num_boxes"], -1)[:-1]
+        sizes = torch.cumsum(batched_targets['num_boxes'], -1)[:-1]
         costs = [c[i] for i, c in enumerate(np.split(C, sizes.cpu().numpy(), axis=-1))]
         return_tgt_indices = False
         for c in costs:
@@ -407,12 +357,7 @@ class BinaryFocalHungarianMatcher(nn.Module):
                 break
         if return_tgt_indices:
             indices, tgt_indices = zip(
-                *(
-                    _do_matching(
-                        c, repeats=repeats, return_tgt_indices=return_tgt_indices
-                    )
-                    for c in costs
-                )
+                *(_do_matching(c, repeats=repeats, return_tgt_indices=return_tgt_indices) for c in costs)
             )
             tgt_indices = list(tgt_indices)
             for i in range(1, len(tgt_indices)):
@@ -422,9 +367,7 @@ class BinaryFocalHungarianMatcher(nn.Module):
             indices = [_do_matching(c, repeats=repeats) for c in costs]
             tgt_idx = None
 
-        batch_idx = torch.as_tensor(
-            sum([[i] * len(src) for i, src in enumerate(indices)], []), dtype=torch.long
-        )
+        batch_idx = torch.as_tensor(sum([[i] * len(src) for i, src in enumerate(indices)], []), dtype=torch.long)
         src_idx = torch.from_numpy(np.concatenate(indices)).long()
         return batch_idx, src_idx, tgt_idx
 
@@ -469,9 +412,7 @@ class BinaryHungarianMatcherV2(nn.Module):
         self.cost_bbox = cost_bbox
         self.cost_giou = cost_giou
         self.norm = nn.Sigmoid()
-        assert cost_class != 0 or cost_bbox != 0 or cost_giou != 0, (
-            "all costs cant be 0"
-        )
+        assert cost_class != 0 or cost_bbox != 0 or cost_giou != 0, 'all costs cant be 0'
         self.focal = focal
         if focal:
             self.alpha = alpha
@@ -530,17 +471,17 @@ class BinaryHungarianMatcherV2(nn.Module):
                 len(index_i) = len(index_j)
                              = min(num_queries, num_target_boxes)
         """
-        _, num_queries = outputs["pred_logits"].shape[:2]
+        _, num_queries = outputs['pred_logits'].shape[:2]
 
-        out_score = outputs["pred_logits"].squeeze(-1)  # (B, Q)
-        out_bbox = outputs["pred_boxes"]  # (B, Q, 4))
+        out_score = outputs['pred_logits'].squeeze(-1)  # (B, Q)
+        out_bbox = outputs['pred_boxes']  # (B, Q, 4))
 
         device = out_score.device
 
-        num_boxes = batched_targets["num_boxes"].cpu()
+        num_boxes = batched_targets['num_boxes'].cpu()
         # Get a padded version of target boxes (as precomputed in the collator).
         # It should work for both repeat==1 (o2o) and repeat>1 (o2m) matching.
-        tgt_bbox = batched_targets["boxes_padded"]
+        tgt_bbox = batched_targets['boxes_padded']
         if self.remove_samples_with_0_gt:
             # keep only samples w/ at least 1 GT box in targets (num_boxes and tgt_bbox)
             batch_keep = num_boxes > 0
@@ -572,9 +513,7 @@ class BinaryHungarianMatcherV2(nn.Module):
         cost_bbox = torch.cdist(out_bbox, tgt_bbox, p=1)
 
         # Compute the giou cost betwen boxes
-        cost_giou = -generalized_box_iou(
-            box_cxcywh_to_xyxy(out_bbox), box_cxcywh_to_xyxy(tgt_bbox)
-        )
+        cost_giou = -generalized_box_iou(box_cxcywh_to_xyxy(out_bbox), box_cxcywh_to_xyxy(tgt_bbox))
 
         out_prob = self.norm(out_score)
         if not self.focal:
@@ -583,9 +522,9 @@ class BinaryHungarianMatcherV2(nn.Module):
             if self.stable:
                 rescaled_giou = (-cost_giou + 1) / 2
                 out_prob = out_prob.unsqueeze(-1).expand_as(cost_bbox) * rescaled_giou
-                cost_class = -self.alpha * (1 - out_prob) ** self.gamma * torch.log(
-                    out_prob
-                ) + (1 - self.alpha) * out_prob**self.gamma * torch.log(1 - out_prob)
+                cost_class = -self.alpha * (1 - out_prob) ** self.gamma * torch.log(out_prob) + (
+                    1 - self.alpha
+                ) * out_prob**self.gamma * torch.log(1 - out_prob)
             else:
                 # directly computing log sigmoid (more numerically stable)
                 log_out_prob = torch.nn.functional.logsigmoid(out_score)
@@ -600,11 +539,7 @@ class BinaryHungarianMatcherV2(nn.Module):
         assert cost_class.shape == cost_bbox.shape
 
         # Final cost matrix
-        C = (
-            self.cost_bbox * cost_bbox
-            + self.cost_class * cost_class
-            + self.cost_giou * cost_giou
-        )
+        C = self.cost_bbox * cost_bbox + self.cost_class * cost_class + self.cost_giou * cost_giou
         # assign a very high cost (1e9) to invalid outputs and targets, so that we can
         # filter them out (in `_do_matching`) from bipartite matching results
         do_filtering = out_is_valid is not None or target_is_valid_padded is not None
@@ -614,9 +549,7 @@ class BinaryHungarianMatcherV2(nn.Module):
             C = torch.where(target_is_valid_padded[:, None, :], C, 1e9)
         C = C.cpu().numpy()
         costs = [C[i, :, :s] for i, s in enumerate(num_boxes.tolist())]
-        return_tgt_indices = (
-            do_filtering or torch.any(num_queries < num_boxes * max(repeats, 1)).item()
-        )
+        return_tgt_indices = do_filtering or torch.any(num_queries < num_boxes * max(repeats, 1)).item()
         if len(costs) == 0:
             # We have size 0 in the batch dimension, so we return empty matching indices
             # (note that this can happen due to `remove_samples_with_0_gt=True` even if
@@ -641,10 +574,7 @@ class BinaryHungarianMatcherV2(nn.Module):
                 tgt_indices[i] += sizes[i - 1].item()
             tgt_idx = torch.from_numpy(np.concatenate(tgt_indices)).long().to(device)
         else:
-            indices = [
-                _do_matching(c, repeats=repeats, do_filtering=do_filtering)
-                for c in costs
-            ]
+            indices = [_do_matching(c, repeats=repeats, do_filtering=do_filtering) for c in costs]
             tgt_idx = None
 
         if self.remove_samples_with_0_gt:
@@ -746,15 +676,15 @@ class BinaryOneToManyMatcher(nn.Module):
                              = min(num_queries, num_target_boxes)
         """
         assert repeats <= 1 and repeat_batch <= 1
-        bs, num_queries = outputs["pred_logits"].shape[:2]
+        bs, num_queries = outputs['pred_logits'].shape[:2]
 
-        out_prob = self.norm(outputs["pred_logits"]).squeeze(-1)  # (B, Q)
-        out_bbox = outputs["pred_boxes"]  # (B, Q, 4))
+        out_prob = self.norm(outputs['pred_logits']).squeeze(-1)  # (B, Q)
+        out_bbox = outputs['pred_boxes']  # (B, Q, 4))
 
-        num_boxes = batched_targets["num_boxes"]
+        num_boxes = batched_targets['num_boxes']
 
         # Get a padded version of target boxes (as precomputed in the collator).
-        tgt_bbox = batched_targets["boxes_padded"]
+        tgt_bbox = batched_targets['boxes_padded']
         assert len(tgt_bbox) == bs
         num_targets = tgt_bbox.shape[1]
         if num_targets == 0:
@@ -777,9 +707,7 @@ class BinaryOneToManyMatcher(nn.Module):
             C = torch.where(target_is_valid_padded[:, None, :], C, -1e9)
 
         # Selecting topk predictions
-        matches = C > torch.quantile(
-            C, 1 - self.topk / num_queries, dim=1, keepdim=True
-        )
+        matches = C > torch.quantile(C, 1 - self.topk / num_queries, dim=1, keepdim=True)
 
         # Selecting predictions above threshold
         matches = matches & (C > self.threshold)
@@ -790,8 +718,7 @@ class BinaryOneToManyMatcher(nn.Module):
 
         # Removing padding
         matches = matches & (
-            torch.arange(0, num_targets, device=num_boxes.device)[None]
-            < num_boxes[:, None]
+            torch.arange(0, num_targets, device=num_boxes.device)[None] < num_boxes[:, None]
         ).unsqueeze(1)
 
         batch_idx, src_idx, tgt_idx = torch.nonzero(matches, as_tuple=True)

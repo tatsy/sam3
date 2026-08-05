@@ -11,15 +11,15 @@ import triton.language as tl
 
 @triton.autotune(
     configs=[
-        triton.Config({"cxpr_block_size": 128}),
-        triton.Config({"cxpr_block_size": 256}),
-        triton.Config({"cxpr_block_size": 512}),
-        triton.Config({"cxpr_block_size": 1024}),
-        triton.Config({"cxpr_block_size": 2048}),
-        triton.Config({"cxpr_block_size": 4096}),
-        triton.Config({"cxpr_block_size": 8192}),
+        triton.Config({'cxpr_block_size': 128}),
+        triton.Config({'cxpr_block_size': 256}),
+        triton.Config({'cxpr_block_size': 512}),
+        triton.Config({'cxpr_block_size': 1024}),
+        triton.Config({'cxpr_block_size': 2048}),
+        triton.Config({'cxpr_block_size': 4096}),
+        triton.Config({'cxpr_block_size': 8192}),
     ],
-    key=["num_boxes"],
+    key=['num_boxes'],
 )
 @triton.jit
 def _nms_suppression_kernel(
@@ -74,9 +74,7 @@ def _nms_suppression_kernel(
                 suppression_mask = tl.cast(suppression_mask, tl.int1)
 
                 # Conditionally store suppression result for high-IoU boxes
-                tl.store(
-                    keep_mask_ptr + target_box_offsets, False, mask=suppression_mask
-                )
+                tl.store(keep_mask_ptr + target_box_offsets, False, mask=suppression_mask)
 
             # Potential race condition: we need to ensure all threads complete the store before the next
             # iteration otherwise we may load stale data for whether or not a box has been suppressed.
@@ -98,7 +96,7 @@ def nms_triton(
     Returns:
         Tensor: Indices of kept boxes, sorted by decreasing score.
     """
-    assert scores.dim() == 1, "Scores must be 1D"
+    assert scores.dim() == 1, 'Scores must be 1D'
     iou_mask = ious > iou_threshold
     assert iou_mask.dim() == 2
     assert iou_mask.shape[0] == iou_mask.shape[1] == scores.shape[0]

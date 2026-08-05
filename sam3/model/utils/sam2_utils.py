@@ -17,11 +17,11 @@ from tqdm import tqdm
 
 def _load_img_as_tensor(img_path, image_size):
     img_pil = Image.open(img_path)
-    img_np = np.array(img_pil.convert("RGB").resize((image_size, image_size)))
+    img_np = np.array(img_pil.convert('RGB').resize((image_size, image_size)))
     if img_np.dtype == np.uint8:  # np.uint8 is expected for JPEG images
         img_np = img_np / 255.0
     else:
-        raise RuntimeError(f"Unknown image dtype: {img_np.dtype} on {img_path}")
+        raise RuntimeError(f'Unknown image dtype: {img_np.dtype} on {img_path}')
     img = torch.from_numpy(img_np).permute(2, 0, 1)
     video_width, video_height = img_pil.size  # the original video size
     return img, video_height, video_width
@@ -62,7 +62,7 @@ class AsyncVideoFrameLoader:
         # load the rest of frames asynchronously without blocking the session start
         def _load_frames():
             try:
-                for n in tqdm(range(len(self.images)), desc="frame loading (JPEG)"):
+                for n in tqdm(range(len(self.images)), desc='frame loading (JPEG)'):
                     self.__getitem__(n)
             except Exception as e:
                 self.exception = e
@@ -72,15 +72,13 @@ class AsyncVideoFrameLoader:
 
     def __getitem__(self, index):
         if self.exception is not None:
-            raise RuntimeError("Failure in frame loading thread") from self.exception
+            raise RuntimeError('Failure in frame loading thread') from self.exception
 
         img = self.images[index]
         if img is not None:
             return img
 
-        img, video_height, video_width = _load_img_as_tensor(
-            self.img_paths[index], self.image_size
-        )
+        img, video_height, video_width = _load_img_as_tensor(self.img_paths[index], self.image_size)
         self.video_height = video_height
         self.video_width = video_width
         # normalize by mean and std
@@ -102,7 +100,7 @@ def load_video_frames(
     img_mean=(0.5, 0.5, 0.5),
     img_std=(0.5, 0.5, 0.5),
     async_loading_frames=False,
-    compute_device=torch.device("cuda"),
+    compute_device=torch.device('cuda'),
 ):
     """
     Load the video frames from video_path. The frames are resized to image_size as in
@@ -110,7 +108,7 @@ def load_video_frames(
     """
     is_bytes = isinstance(video_path, bytes)
     is_str = isinstance(video_path, str)
-    is_mp4_path = is_str and os.path.splitext(video_path)[-1] in [".mp4", ".MP4"]
+    is_mp4_path = is_str and os.path.splitext(video_path)[-1] in ['.mp4', '.MP4']
     if is_bytes or is_mp4_path:
         return load_video_frames_from_video_file(
             video_path=video_path,
@@ -131,9 +129,7 @@ def load_video_frames(
             compute_device=compute_device,
         )
     else:
-        raise NotImplementedError(
-            "Only MP4 video and JPEG folder are supported at this moment"
-        )
+        raise NotImplementedError('Only MP4 video and JPEG folder are supported at this moment')
 
 
 def load_video_frames_from_jpg_images(
@@ -143,7 +139,7 @@ def load_video_frames_from_jpg_images(
     img_mean=(0.5, 0.5, 0.5),
     img_std=(0.5, 0.5, 0.5),
     async_loading_frames=False,
-    compute_device=torch.device("cuda"),
+    compute_device=torch.device('cuda'),
 ):
     """
     Load the video frames from a directory of JPEG files ("<frame_index>.jpg" format).
@@ -157,24 +153,20 @@ def load_video_frames_from_jpg_images(
         jpg_folder = video_path
     else:
         raise NotImplementedError(
-            "Only JPEG frames are supported at this moment. For video files, you may use "
-            "ffmpeg (https://ffmpeg.org/) to extract frames into a folder of JPEG files, such as \n"
-            "```\n"
+            'Only JPEG frames are supported at this moment. For video files, you may use '
+            'ffmpeg (https://ffmpeg.org/) to extract frames into a folder of JPEG files, such as \n'
+            '```\n'
             "ffmpeg -i <your_video>.mp4 -q:v 2 -start_number 0 <output_dir>/'%05d.jpg'\n"
-            "```\n"
-            "where `-q:v` generates high-quality JPEG frames and `-start_number 0` asks "
-            "ffmpeg to start the JPEG file from 00000.jpg."
+            '```\n'
+            'where `-q:v` generates high-quality JPEG frames and `-start_number 0` asks '
+            'ffmpeg to start the JPEG file from 00000.jpg.'
         )
 
-    frame_names = [
-        p
-        for p in os.listdir(jpg_folder)
-        if os.path.splitext(p)[-1] in [".jpg", ".jpeg", ".JPG", ".JPEG"]
-    ]
+    frame_names = [p for p in os.listdir(jpg_folder) if os.path.splitext(p)[-1] in ['.jpg', '.jpeg', '.JPG', '.JPEG']]
     frame_names.sort(key=lambda p: int(os.path.splitext(p)[0]))
     num_frames = len(frame_names)
     if num_frames == 0:
-        raise RuntimeError(f"no images found in {jpg_folder}")
+        raise RuntimeError(f'no images found in {jpg_folder}')
     img_paths = [os.path.join(jpg_folder, frame_name) for frame_name in frame_names]
     img_mean = torch.tensor(img_mean, dtype=torch.float32)[:, None, None]
     img_std = torch.tensor(img_std, dtype=torch.float32)[:, None, None]
@@ -191,7 +183,7 @@ def load_video_frames_from_jpg_images(
         return lazy_images, lazy_images.video_height, lazy_images.video_width
 
     images = torch.zeros(num_frames, 3, image_size, image_size, dtype=torch.float32)
-    for n, img_path in enumerate(tqdm(img_paths, desc="frame loading (JPEG)")):
+    for n, img_path in enumerate(tqdm(img_paths, desc='frame loading (JPEG)')):
         images[n], video_height, video_width = _load_img_as_tensor(img_path, image_size)
     if not offload_video_to_cpu:
         images = images.to(compute_device)
@@ -209,7 +201,7 @@ def load_video_frames_from_video_file(
     offload_video_to_cpu,
     img_mean=(0.5, 0.5, 0.5),
     img_std=(0.5, 0.5, 0.5),
-    compute_device=torch.device("cuda"),
+    compute_device=torch.device('cuda'),
 ):
     """Load the video frames from a video file."""
     import decord
@@ -217,7 +209,7 @@ def load_video_frames_from_video_file(
     img_mean = torch.tensor(img_mean, dtype=torch.float32)[:, None, None]
     img_std = torch.tensor(img_std, dtype=torch.float32)[:, None, None]
     # Get the original video height and width
-    decord.bridge.set_bridge("torch")
+    decord.bridge.set_bridge('torch')
     video_height, video_width, _ = decord.VideoReader(video_path).next().shape
     # Iterate over all frames in the video
     images = []

@@ -22,9 +22,7 @@ Scalar = Union[Tensor, ndarray, int, float]
 def make_tensorboard_logger(log_dir: str, **writer_kwargs: Any):
     makedir(log_dir)
     summary_writer_method = SummaryWriter
-    return TensorBoardLogger(
-        path=log_dir, summary_writer_method=summary_writer_method, **writer_kwargs
-    )
+    return TensorBoardLogger(path=log_dir, summary_writer_method=summary_writer_method, **writer_kwargs)
 
 
 class TensorBoardWriterWrapper:
@@ -59,9 +57,7 @@ class TensorBoardWriterWrapper:
         _, self._rank = get_machine_local_and_dist_rank()
         self._path: str = path
         if self._rank == 0:
-            logging.info(
-                f"TensorBoard SummaryWriter instantiated. Files will be stored in: {path}"
-            )
+            logging.info(f'TensorBoard SummaryWriter instantiated. Files will be stored in: {path}')
             self._writer = summary_writer_method(
                 log_dir=path,
                 *args,
@@ -69,9 +65,7 @@ class TensorBoardWriterWrapper:
                 **kwargs,
             )
         else:
-            logging.debug(
-                f"Not logging meters on this host because env RANK: {self._rank} != 0"
-            )
+            logging.debug(f'Not logging meters on this host because env RANK: {self._rank} != 0')
         atexit.register(self.close)
 
     @property
@@ -131,9 +125,7 @@ class TensorBoardLogger(TensorBoardWriterWrapper):
             return
         self._writer.add_scalar(name, data, global_step=step, new_style=True)
 
-    def log_hparams(
-        self, hparams: Dict[str, Scalar], meters: Dict[str, Scalar]
-    ) -> None:
+    def log_hparams(self, hparams: Dict[str, Scalar], meters: Dict[str, Scalar]) -> None:
         """Add hyperparameter data to TensorBoard.
 
         Args:
@@ -153,7 +145,7 @@ class Logger:
     def __init__(self, logging_conf):
         # allow turning off TensorBoard with "should_log: false" in config
         tb_config = logging_conf.tensorboard_writer
-        tb_should_log = tb_config and tb_config.pop("should_log", True)
+        tb_should_log = tb_config and tb_config.pop('should_log', True)
         self.tb_logger = instantiate(tb_config) if tb_should_log else None
 
     def log_dict(self, payload: Dict[str, Scalar], step: int) -> None:
@@ -164,9 +156,7 @@ class Logger:
         if self.tb_logger:
             self.tb_logger.log(name, data, step)
 
-    def log_hparams(
-        self, hparams: Dict[str, Scalar], meters: Dict[str, Scalar]
-    ) -> None:
+    def log_hparams(self, hparams: Dict[str, Scalar], meters: Dict[str, Scalar]) -> None:
         if self.tb_logger:
             self.tb_logger.log_hparams(hparams, meters)
 
@@ -178,7 +168,7 @@ def _cached_log_stream(filename):
     # we tune the buffering value so that the logs are updated
     # frequently.
     log_buffer_kb = 10 * 1024  # 10KB
-    io = g_pathmgr.open(filename, mode="a", buffering=log_buffer_kb)
+    io = g_pathmgr.open(filename, mode='a', buffering=log_buffer_kb)
     atexit.register(io.close)
     return io
 
@@ -187,8 +177,8 @@ def setup_logging(
     name,
     output_dir=None,
     rank=0,
-    log_level_primary="INFO",
-    log_level_secondary="ERROR",
+    log_level_primary='INFO',
+    log_level_secondary='ERROR',
 ):
     """
     Setup various logging streams: stdout and file handlers.
@@ -199,13 +189,13 @@ def setup_logging(
     if output_dir:
         makedir(output_dir)
         if rank == 0:
-            log_filename = f"{output_dir}/log.txt"
+            log_filename = f'{output_dir}/log.txt'
 
     logger = logging.getLogger(name)
     logger.setLevel(log_level_primary)
 
     # create formatter
-    FORMAT = "%(levelname)s %(asctime)s %(filename)s:%(lineno)4d: %(message)s"
+    FORMAT = '%(levelname)s %(asctime)s %(filename)s:%(lineno)4d: %(message)s'
     formatter = logging.Formatter(FORMAT)
 
     # Cleanup any existing handlers
@@ -236,7 +226,7 @@ def shutdown_logging():
     """
     After training is done, we ensure to shut down all the logger streams.
     """
-    logging.info("Shutting down loggers...")
+    logging.info('Shutting down loggers...')
     handlers = logging.root.handlers
     for handler in handlers:
         handler.close()

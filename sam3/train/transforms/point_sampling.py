@@ -33,15 +33,15 @@ def sample_points_from_rle(rle, n_points, mode, box=None, normalize=True):
 
 
 def sample_points_from_mask(mask, n_points, mode, box=None):
-    if mode == "centered":
+    if mode == 'centered':
         points = center_positive_sample(mask, n_points)
-    elif mode == "random_mask":
+    elif mode == 'random_mask':
         points = uniform_positive_sample(mask, n_points)
-    elif mode == "random_box":
+    elif mode == 'random_box':
         assert box is not None, "'random_box' mode requires a provided box."
         points = uniform_sample_from_box(mask, box, n_points)
     else:
-        raise ValueError(f"Unknown point sampling mode {mode}.")
+        raise ValueError(f'Unknown point sampling mode {mode}.')
     return points
 
 
@@ -201,9 +201,9 @@ class RandomGeometricInputsAPI:
         box_noise_max=None,
         minimum_box_area=0.0,
         resample_box_from_mask=False,
-        point_sample_mode="random_mask",
+        point_sample_mode='random_mask',
         sample_box_scale_factor=1.0,
-        geometric_query_str="geometric",
+        geometric_query_str='geometric',
         concat_points=False,
     ):
         self.num_points = num_points
@@ -218,19 +218,17 @@ class RandomGeometricInputsAPI:
         self.resample_box_from_mask = resample_box_from_mask
         self.point_sample_mode = point_sample_mode
         assert point_sample_mode in [
-            "centered",
-            "random_mask",
-            "random_box",
-        ], "Unknown point sample mode."
+            'centered',
+            'random_mask',
+            'random_box',
+        ], 'Unknown point sample mode.'
         self.geometric_query_str = geometric_query_str
         self.concat_points = concat_points
         self.sample_box_scale_factor = sample_box_scale_factor
 
     def _sample_num_points_and_if_box(self):
         if isinstance(self.num_points, tuple):
-            n_points = torch.randint(
-                low=self.num_points[0], high=self.num_points[1], size=(1,)
-            ).item()
+            n_points = torch.randint(low=self.num_points[0], high=self.num_points[1], size=(1,)).item()
         else:
             n_points = self.num_points
         if self.box_chance > 0.0:
@@ -249,9 +247,7 @@ class RandomGeometricInputsAPI:
     def _get_target_object(self, datapoint, query):
         img = datapoint.images[query.image_id]
         targets = query.object_ids_output
-        assert len(targets) == 1, (
-            "Geometric queries only support a single target object."
-        )
+        assert len(targets) == 1, 'Geometric queries only support a single target object.'
         target_idx = targets[0]
         return img.objects[target_idx]
 
@@ -270,9 +266,7 @@ class RandomGeometricInputsAPI:
                 # is awkward, but this is all in the dataloader worker anyway
                 # on CPU and so I don't think it should matter.
                 if self.sample_box_scale_factor != 1.0:
-                    sample_box = rescale_box_xyxy(
-                        box.numpy(), self.sample_box_scale_factor, mask.shape
-                    )
+                    sample_box = rescale_box_xyxy(box.numpy(), self.sample_box_scale_factor, mask.shape)
                 else:
                     sample_box = box.numpy()
                 input_points = sample_points_from_mask(

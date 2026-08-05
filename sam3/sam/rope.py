@@ -19,7 +19,7 @@ from torch import broadcast_tensors, nn
 def init_t_xy(end_x: int, end_y: int, scale: float = 1.0, offset: int = 0, device=None):
     t = torch.arange(end_x * end_y, dtype=torch.float32, device=device)
     t_x = (t % end_x).float()
-    t_y = torch.div(t, end_x, rounding_mode="floor").float()
+    t_y = torch.div(t, end_x, rounding_mode='floor').float()
     return t_x * scale + offset, t_y * scale + offset
 
 
@@ -32,12 +32,8 @@ def compute_axial_cis(
     offset: int = 0,
     device=None,
 ):
-    freqs_x = 1.0 / (
-        theta ** (torch.arange(0, dim, 4, device=device)[: (dim // 4)].float() / dim)
-    )
-    freqs_y = 1.0 / (
-        theta ** (torch.arange(0, dim, 4, device=device)[: (dim // 4)].float() / dim)
-    )
+    freqs_x = 1.0 / (theta ** (torch.arange(0, dim, 4, device=device)[: (dim // 4)].float() / dim))
+    freqs_y = 1.0 / (theta ** (torch.arange(0, dim, 4, device=device)[: (dim // 4)].float() / dim))
 
     t_x, t_y = init_t_xy(end_x, end_y, scale_pos, offset, device=device)
     freqs_x = torch.outer(t_x, freqs_x)
@@ -62,11 +58,7 @@ def apply_rotary_enc(
     repeat_freqs_k: bool = False,
 ):
     xq_ = torch.view_as_complex(xq.float().reshape(*xq.shape[:-1], -1, 2))
-    xk_ = (
-        torch.view_as_complex(xk.float().reshape(*xk.shape[:-1], -1, 2))
-        if xk.shape[-2] != 0
-        else None
-    )
+    xk_ = torch.view_as_complex(xk.float().reshape(*xk.shape[:-1], -1, 2)) if xk.shape[-2] != 0 else None
     freqs_cis = reshape_for_broadcast(freqs_cis, xq_)
     xq_out = torch.view_as_real(xq_ * freqs_cis).flatten(3)
     if xk_ is None:
@@ -123,10 +115,10 @@ def broadcat(tensors, dim=-1):
 
 
 def rotate_half(x: torch.Tensor):
-    x = rearrange(x, "... (d r) -> ... d r", r=2)
+    x = rearrange(x, '... (d r) -> ... d r', r=2)
     x1, x2 = x.unbind(dim=-1)
     x = torch.stack((-x2, x1), dim=-1)
-    return rearrange(x, "... d r -> ... (d r)")
+    return rearrange(x, '... d r -> ... (d r)')
 
 
 class VisionRotaryEmbeddingVE(nn.Module):
@@ -149,15 +141,15 @@ class VisionRotaryEmbeddingVE(nn.Module):
         # attention op only differences matter
         t = torch.arange(seq_len) * scale + offset
 
-        freqs = torch.einsum("..., f -> ... f", t, freqs)
-        freqs = repeat(freqs, "... n -> ... (n r)", r=2)
+        freqs = torch.einsum('..., f -> ... f', t, freqs)
+        freqs = repeat(freqs, '... n -> ... (n r)', r=2)
 
         freqs = broadcat((freqs[None, :, :], freqs[:, None, :]), dim=-1)
         freqs_cos = freqs.cos().view(-1, freqs.shape[-1])
         freqs_sin = freqs.sin().view(-1, freqs.shape[-1])
 
-        self.register_buffer("freqs_cos", freqs_cos)
-        self.register_buffer("freqs_sin", freqs_sin)
+        self.register_buffer('freqs_cos', freqs_cos)
+        self.register_buffer('freqs_sin', freqs_sin)
 
     def forward(self, t: torch.Tensor):
         # pyrefly: ignore [unsupported-operation]

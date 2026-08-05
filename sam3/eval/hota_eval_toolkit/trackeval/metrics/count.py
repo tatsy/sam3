@@ -11,7 +11,7 @@ class Count(_BaseMetric):
 
     def __init__(self, config=None):
         super().__init__()
-        self.integer_fields = ["Dets", "GT_Dets", "IDs", "GT_IDs"]
+        self.integer_fields = ['Dets', 'GT_Dets', 'IDs', 'GT_IDs']
         self.fields = self.integer_fields
         self.summary_fields = self.fields
 
@@ -20,11 +20,11 @@ class Count(_BaseMetric):
         """Returns counts for one sequence"""
         # Get results
         res = {
-            "Dets": data["num_tracker_dets"],
-            "GT_Dets": data["num_gt_dets"],
-            "IDs": data["num_tracker_ids"],
-            "GT_IDs": data["num_gt_ids"],
-            "Frames": data["num_timesteps"],
+            'Dets': data['num_tracker_dets'],
+            'GT_Dets': data['num_gt_dets'],
+            'IDs': data['num_tracker_ids'],
+            'GT_IDs': data['num_gt_ids'],
+            'Frames': data['num_timesteps'],
         }
         return res
 

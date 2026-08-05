@@ -221,7 +221,7 @@ class SigmoidFocalLoss(torch.autograd.Function):
         inputs = inputs.view(-1).contiguous()
         targets = targets.view(-1).contiguous()
         loss = torch.empty(inputs.shape, dtype=torch.float32, device=inputs.device)
-        grid = lambda meta: (triton.cdiv(n_elements, meta["BLOCK_SIZE"]),)
+        grid = lambda meta: (triton.cdiv(n_elements, meta['BLOCK_SIZE']),)
         sigmoid_focal_loss_fwd_kernel[grid](
             inputs, targets, loss, alpha, gamma, n_elements, SigmoidFocalLoss.BLOCK_SIZE
         )
@@ -238,15 +238,13 @@ class SigmoidFocalLoss(torch.autograd.Function):
         gamma = ctx.gamma
         n_elements = inputs.numel()
         input_shape = inputs.shape
-        grad_inputs = torch.empty(
-            inputs.shape, dtype=grad_output.dtype, device=grad_output.device
-        )
+        grad_inputs = torch.empty(inputs.shape, dtype=grad_output.dtype, device=grad_output.device)
         inputs_ptr = inputs.view(-1).contiguous()
         targets_ptr = targets.view(-1).contiguous()
         grad_output_ptr = grad_output.view(-1).contiguous()
         grad_inputs_ptr = grad_inputs
         assert grad_output.numel() == n_elements
-        grid = lambda meta: (triton.cdiv(n_elements, meta["BLOCK_SIZE"]),)
+        grid = lambda meta: (triton.cdiv(n_elements, meta['BLOCK_SIZE']),)
         sigmoid_focal_loss_bwd_kernel[grid](
             inputs_ptr,
             targets_ptr,
@@ -278,7 +276,7 @@ class SigmoidFocalLossReduced(torch.autograd.Function):
             device=inputs.device,
             dtype=torch.float32,
         )
-        grid = lambda meta: (triton.cdiv(n_elements, meta["BLOCK_SIZE"]),)
+        grid = lambda meta: (triton.cdiv(n_elements, meta['BLOCK_SIZE']),)
         sigmoid_focal_loss_fwd_kernel_reduce[grid](
             inputs,
             targets,
@@ -302,13 +300,11 @@ class SigmoidFocalLossReduced(torch.autograd.Function):
         gamma = ctx.gamma
         n_elements = inputs.numel()
         input_shape = inputs.shape
-        grad_inputs = torch.empty(
-            inputs.shape, dtype=grad_output.dtype, device=grad_output.device
-        )
+        grad_inputs = torch.empty(inputs.shape, dtype=grad_output.dtype, device=grad_output.device)
         inputs_ptr = inputs.view(-1).contiguous()
         targets_ptr = targets.reshape(-1).contiguous()
         assert grad_output.numel() == 1
-        grid = lambda meta: (triton.cdiv(n_elements, meta["BLOCK_SIZE"]),)
+        grid = lambda meta: (triton.cdiv(n_elements, meta['BLOCK_SIZE']),)
         sigmoid_focal_loss_bwd_kernel_reduce[grid](
             inputs_ptr,
             targets_ptr,

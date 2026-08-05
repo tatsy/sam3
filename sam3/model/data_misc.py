@@ -64,21 +64,15 @@ pytree.register_pytree_node(
 )
 
 
-def interpolate(
-    input, size=None, scale_factor=None, mode="nearest", align_corners=None
-):
+def interpolate(input, size=None, scale_factor=None, mode='nearest', align_corners=None):
     # type: (Tensor, Optional[List[int]], Optional[float], str, Optional[bool]) -> Tensor
     """
     Equivalent to nn.functional.interpolate, but with support for empty channel sizes.
     """
     if input.numel() > 0:
-        return torch.nn.functional.interpolate(
-            input, size, scale_factor, mode, align_corners
-        )
+        return torch.nn.functional.interpolate(input, size, scale_factor, mode, align_corners)
 
-    assert input.shape[0] != 0 or input.shape[1] != 0, (
-        "At least one of the two first dimensions must be non zero"
-    )
+    assert input.shape[0] != 0 or input.shape[1] != 0, 'At least one of the two first dimensions must be non zero'
 
     if input.shape[1] == 0:
         # Pytorch doesn't support null dimension on the channel dimension, so we transpose to fake a null batch dim
@@ -87,9 +81,7 @@ def interpolate(
         ).transpose(0, 1)
 
     # empty batch dimension is now supported in pytorch
-    return torch.nn.functional.interpolate(
-        input, size, scale_factor, mode, align_corners
-    )
+    return torch.nn.functional.interpolate(input, size, scale_factor, mode, align_corners)
 
 
 @dataclass
@@ -241,29 +233,23 @@ def convert_my_tensors(obj):
         if field_type != MyTensor or getattr(obj, field.name) is None:
             continue
 
-        elif len(getattr(obj, field.name)) and isinstance(
-            getattr(obj, field.name)[0], torch.Tensor
-        ):
+        elif len(getattr(obj, field.name)) and isinstance(getattr(obj, field.name)[0], torch.Tensor):
             stack_dim = 0
             if field.name in [
-                "input_boxes_before_embed",
-                "input_boxes",
-                "input_boxes_label",
+                'input_boxes_before_embed',
+                'input_boxes',
+                'input_boxes_label',
             ]:
                 stack_dim = 1
             setattr(
                 obj,
                 field.name,
-                torch.stack(getattr(obj, field.name), dim=stack_dim).to(
-                    getattr(obj, field.name + "__type")
-                ),
+                torch.stack(getattr(obj, field.name), dim=stack_dim).to(getattr(obj, field.name + '__type')),
             )
         else:
             setattr(
                 obj,
                 field.name,
-                torch.as_tensor(
-                    getattr(obj, field.name), dtype=getattr(obj, field.name + "__type")
-                ),
+                torch.as_tensor(getattr(obj, field.name), dtype=getattr(obj, field.name + '__type')),
             )
     return obj

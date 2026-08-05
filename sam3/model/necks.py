@@ -45,21 +45,21 @@ class Sam3DualViTDetNeck(nn.Module):
 
             if scale == 4.0:
                 current.add_module(
-                    "dconv_2x2_0",
+                    'dconv_2x2_0',
                     nn.ConvTranspose2d(dim, dim // 2, kernel_size=2, stride=2),
                 )
                 current.add_module(
-                    "gelu",
+                    'gelu',
                     nn.GELU(),
                 )
                 current.add_module(
-                    "dconv_2x2_1",
+                    'dconv_2x2_1',
                     nn.ConvTranspose2d(dim // 2, dim // 4, kernel_size=2, stride=2),
                 )
                 out_dim = dim // 4
             elif scale == 2.0:
                 current.add_module(
-                    "dconv_2x2",
+                    'dconv_2x2',
                     nn.ConvTranspose2d(dim, dim // 2, kernel_size=2, stride=2),
                 )
                 out_dim = dim // 2
@@ -67,15 +67,15 @@ class Sam3DualViTDetNeck(nn.Module):
                 out_dim = dim
             elif scale == 0.5:
                 current.add_module(
-                    "maxpool_2x2",
+                    'maxpool_2x2',
                     nn.MaxPool2d(kernel_size=2, stride=2),
                 )
                 out_dim = dim
             else:
-                raise NotImplementedError(f"scale_factor={scale} is not supported yet.")
+                raise NotImplementedError(f'scale_factor={scale} is not supported yet.')
 
             current.add_module(
-                "conv_1x1",
+                'conv_1x1',
                 nn.Conv2d(
                     in_channels=out_dim,
                     out_channels=d_model,
@@ -84,7 +84,7 @@ class Sam3DualViTDetNeck(nn.Module):
                 ),
             )
             current.add_module(
-                "conv_3x3",
+                'conv_3x3',
                 nn.Conv2d(
                     in_channels=d_model,
                     out_channels=d_model,
@@ -157,23 +157,23 @@ class Sam3TriViTDetNeck(nn.Module):
 
             if scale == 4.0:
                 current.add_module(
-                    "dconv_2x2_0",
+                    'dconv_2x2_0',
                     # pyrefly: ignore [bad-argument-type]
                     nn.ConvTranspose2d(dim, dim // 2, kernel_size=2, stride=2),
                 )
                 current.add_module(
-                    "gelu",
+                    'gelu',
                     nn.GELU(),
                 )
                 current.add_module(
-                    "dconv_2x2_1",
+                    'dconv_2x2_1',
                     # pyrefly: ignore [bad-argument-type]
                     nn.ConvTranspose2d(dim // 2, dim // 4, kernel_size=2, stride=2),
                 )
                 out_dim = dim // 4
             elif scale == 2.0:
                 current.add_module(
-                    "dconv_2x2",
+                    'dconv_2x2',
                     # pyrefly: ignore [bad-argument-type]
                     nn.ConvTranspose2d(dim, dim // 2, kernel_size=2, stride=2),
                 )
@@ -182,15 +182,15 @@ class Sam3TriViTDetNeck(nn.Module):
                 out_dim = dim
             elif scale == 0.5:
                 current.add_module(
-                    "maxpool_2x2",
+                    'maxpool_2x2',
                     nn.MaxPool2d(kernel_size=2, stride=2),
                 )
                 out_dim = dim
             else:
-                raise NotImplementedError(f"scale_factor={scale} is not supported yet.")
+                raise NotImplementedError(f'scale_factor={scale} is not supported yet.')
 
             current.add_module(
-                "conv_1x1",
+                'conv_1x1',
                 nn.Conv2d(
                     # pyrefly: ignore [bad-argument-type]
                     in_channels=out_dim,
@@ -200,7 +200,7 @@ class Sam3TriViTDetNeck(nn.Module):
                 ),
             )
             current.add_module(
-                "conv_3x3",
+                'conv_3x3',
                 nn.Conv2d(
                     in_channels=d_model,
                     out_channels=d_model,
@@ -234,8 +234,8 @@ class Sam3TriViTDetNeck(nn.Module):
         x = xs[-1]  # simpleFPN
         # OSS trunk returns plain tensors; onevision trunk returns NestedTensors.
         # Use getattr to handle both in a torch.compile-friendly way.
-        x_data = getattr(x, "tensors", x)
-        x_mask = getattr(x, "mask", None)
+        x_data = getattr(x, 'tensors', x)
+        x_mask = getattr(x, 'mask', None)
         for _, (conv, interactive_conv, propagation_conv) in enumerate(
             zip(self.convs, self.interactive_convs, self.propagation_convs)
         ):
@@ -243,29 +243,19 @@ class Sam3TriViTDetNeck(nn.Module):
                 sam3_conv_out = conv(x_data)
                 sam3_x_out = NestedTensor(sam3_conv_out, x_mask)
                 sam3_out.append(sam3_x_out)
-                sam3_pos.append(
-                    self.position_encoding(sam3_conv_out).to(sam3_conv_out.dtype)
-                )
+                sam3_pos.append(self.position_encoding(sam3_conv_out).to(sam3_conv_out.dtype))
 
             if need_interactive_out:
                 interactive_conv_out_t = interactive_conv(x_data)
                 interactive_conv_out = NestedTensor(interactive_conv_out_t, x_mask)
                 interactive_out.append(interactive_conv_out)
-                interactive_pos.append(
-                    self.position_encoding(interactive_conv_out_t).to(
-                        interactive_conv_out_t.dtype
-                    )
-                )
+                interactive_pos.append(self.position_encoding(interactive_conv_out_t).to(interactive_conv_out_t.dtype))
 
             if need_propagation_out:
                 propagation_conv_out = propagation_conv(x_data)
                 propagation_x_out = NestedTensor(propagation_conv_out, x_mask)
                 propagation_out.append(propagation_x_out)
-                propagation_pos.append(
-                    self.position_encoding(propagation_conv_out).to(
-                        propagation_conv_out.dtype
-                    )
-                )
+                propagation_pos.append(self.position_encoding(propagation_conv_out).to(propagation_conv_out.dtype))
 
         return (
             sam3_out,

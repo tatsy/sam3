@@ -24,7 +24,7 @@ from iopath.common.file_io import g_pathmgr
 
 
 # https://stackoverflow.com/q/62691279
-os.environ["TOKENIZERS_PARALLELISM"] = "false"
+os.environ['TOKENIZERS_PARALLELISM'] = 'false'
 DEFAULT_CONTEXT_LENGTH = 77
 
 
@@ -39,11 +39,7 @@ def bytes_to_unicode():
     To avoid that, we want lookup tables between utf-8 bytes and unicode strings.
     And avoids mapping to whitespace/control characters the bpe code barfs on.
     """
-    bs = (
-        list(range(ord("!"), ord("~") + 1))
-        + list(range(ord("¡"), ord("¬") + 1))
-        + list(range(ord("®"), ord("ÿ") + 1))
-    )
+    bs = list(range(ord('!'), ord('~') + 1)) + list(range(ord('¡'), ord('¬') + 1)) + list(range(ord('®'), ord('ÿ') + 1))
     cs = bs[:]
     n = 0
     for b in range(2**8):
@@ -74,7 +70,7 @@ def basic_clean(text):
 
 
 def whitespace_clean(text):
-    text = re.sub(r"\s+", " ", text)
+    text = re.sub(r'\s+', ' ', text)
     text = text.strip()
     return text
 
@@ -95,14 +91,14 @@ def _clean_whitespace(x):
 
 
 def get_clean_fn(type: str):
-    if type == "canonicalize":
+    if type == 'canonicalize':
         return _clean_canonicalize
-    elif type == "lower":
+    elif type == 'lower':
         return _clean_lower
-    elif type == "whitespace":
+    elif type == 'whitespace':
         return _clean_whitespace
     else:
-        assert False, f"Invalid clean function ({type})."
+        assert False, f'Invalid clean function ({type}).'
 
 
 def canonicalize_text(text, *, keep_punctuation_exact_string=None):
@@ -114,16 +110,16 @@ def canonicalize_text(text, *, keep_punctuation_exact_string=None):
         For example providing '{}' will keep any occurrences of '{}' (but will
         still remove '{' and '}' that appear separately).
     """
-    text = text.replace("_", " ")
+    text = text.replace('_', ' ')
     if keep_punctuation_exact_string:
         text = keep_punctuation_exact_string.join(
-            part.translate(str.maketrans("", "", string.punctuation))
+            part.translate(str.maketrans('', '', string.punctuation))
             for part in text.split(keep_punctuation_exact_string)
         )
     else:
-        text = text.translate(str.maketrans("", "", string.punctuation))
+        text = text.translate(str.maketrans('', '', string.punctuation))
     text = text.lower()
-    text = re.sub(r"\s+", " ", text)
+    text = re.sub(r'\s+', ' ', text)
     return text.strip()
 
 
@@ -133,22 +129,22 @@ class SimpleTokenizer(object):
         bpe_path: Union[str, os.PathLike],
         additional_special_tokens: Optional[List[str]] = None,
         context_length: Optional[int] = DEFAULT_CONTEXT_LENGTH,
-        clean: str = "lower",
+        clean: str = 'lower',
     ):
         self.byte_encoder = bytes_to_unicode()
         self.byte_decoder = {v: k for k, v in self.byte_encoder.items()}
         # pyrefly: ignore [no-matching-overload]
-        with g_pathmgr.open(bpe_path, "rb") as fh:
+        with g_pathmgr.open(bpe_path, 'rb') as fh:
             bpe_bytes = io.BytesIO(fh.read())
-            merges = gzip.open(bpe_bytes).read().decode("utf-8").split("\n")
+            merges = gzip.open(bpe_bytes).read().decode('utf-8').split('\n')
         # merges = gzip.open(bpe_path).read().decode("utf-8").split("\n")
         merges = merges[1 : 49152 - 256 - 2 + 1]
         merges = [tuple(merge.split()) for merge in merges]
         vocab = list(bytes_to_unicode().values())
-        vocab = vocab + [v + "</w>" for v in vocab]
+        vocab = vocab + [v + '</w>' for v in vocab]
         for merge in merges:
-            vocab.append("".join(merge))
-        special_tokens = ["<start_of_text>", "<end_of_text>"]
+            vocab.append(''.join(merge))
+        special_tokens = ['<start_of_text>', '<end_of_text>']
         if additional_special_tokens:
             special_tokens += additional_special_tokens
         vocab.extend(special_tokens)
@@ -156,7 +152,7 @@ class SimpleTokenizer(object):
         self.decoder = {v: k for k, v in self.encoder.items()}
         self.bpe_ranks = dict(zip(merges, range(len(merges))))
         self.cache = {t: t for t in special_tokens}
-        special = "|".join(special_tokens)
+        special = '|'.join(special_tokens)
         self.pat = re.compile(
             special + r"""|'s|'t|'re|'ve|'m|'ll|'d|[\p{L}]+|[\p{N}]|[^\s\p{L}\p{N}]+""",
             re.IGNORECASE,
@@ -171,12 +167,12 @@ class SimpleTokenizer(object):
     def bpe(self, token):
         if token in self.cache:
             return self.cache[token]
-        word = tuple(token[:-1]) + (token[-1] + "</w>",)
+        word = tuple(token[:-1]) + (token[-1] + '</w>',)
         pairs = get_pairs(word)
         if not pairs:
-            return token + "</w>"
+            return token + '</w>'
         while True:
-            bigram = min(pairs, key=lambda pair: self.bpe_ranks.get(pair, float("inf")))
+            bigram = min(pairs, key=lambda pair: self.bpe_ranks.get(pair, float('inf')))
             if bigram not in self.bpe_ranks:
                 break
             first, second = bigram
@@ -202,7 +198,7 @@ class SimpleTokenizer(object):
                 break
             else:
                 pairs = get_pairs(word)
-        word = " ".join(word)
+        word = ' '.join(word)
         self.cache[token] = word
         return word
 
@@ -210,24 +206,16 @@ class SimpleTokenizer(object):
         bpe_tokens = []
         text = self.clean_fn(text)
         for token in re.findall(self.pat, text):
-            token = "".join(self.byte_encoder[b] for b in token.encode("utf-8"))
-            bpe_tokens.extend(
-                self.encoder[bpe_token] for bpe_token in self.bpe(token).split(" ")
-            )
+            token = ''.join(self.byte_encoder[b] for b in token.encode('utf-8'))
+            bpe_tokens.extend(self.encoder[bpe_token] for bpe_token in self.bpe(token).split(' '))
         return bpe_tokens
 
     def decode(self, tokens):
-        text = "".join([self.decoder[token] for token in tokens])
-        text = (
-            bytearray([self.byte_decoder[c] for c in text])
-            .decode("utf-8", errors="replace")
-            .replace("</w>", " ")
-        )
+        text = ''.join([self.decoder[token] for token in tokens])
+        text = bytearray([self.byte_decoder[c] for c in text]).decode('utf-8', errors='replace').replace('</w>', ' ')
         return text
 
-    def __call__(
-        self, texts: Union[str, List[str]], context_length: Optional[int] = None
-    ) -> torch.LongTensor:
+    def __call__(self, texts: Union[str, List[str]], context_length: Optional[int] = None) -> torch.LongTensor:
         """Returns the tokenized representation of given input string(s)
         Parameters
         ----------
@@ -242,11 +230,8 @@ class SimpleTokenizer(object):
         if isinstance(texts, str):
             texts = [texts]
         context_length = context_length or self.context_length
-        assert context_length, "Please set a valid context length"
-        all_tokens = [
-            [self.sot_token_id] + self.encode(text) + [self.eot_token_id]
-            for text in texts
-        ]
+        assert context_length, 'Please set a valid context length'
+        all_tokens = [[self.sot_token_id] + self.encode(text) + [self.eot_token_id] for text in texts]
         result = torch.zeros(len(all_tokens), context_length, dtype=torch.long)
         for i, tokens in enumerate(all_tokens):
             if len(tokens) > context_length:

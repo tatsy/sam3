@@ -41,9 +41,9 @@ class Optimizer:
         for _, set_of_schedulers in enumerate(self.schedulers):
             for option, _ in set_of_schedulers.items():
                 assert option in self.optimizer.defaults, (
-                    "Optimizer option "
-                    f"{option} not found in {self.optimizer}. Valid options are "
-                    f"{self.optimizer.defaults.keys()}"
+                    'Optimizer option '
+                    f'{option} not found in {self.optimizer}. Valid options are '
+                    f'{self.optimizer.defaults.keys()}'
                 )
 
     def step_schedulers(self, where: float, step: int) -> None:
@@ -51,12 +51,11 @@ class Optimizer:
             return
         for i, param_group in enumerate(self.optimizer.param_groups):
             for option, scheduler in self.schedulers[i].items():
-                if "step" in inspect.signature(scheduler.__call__).parameters:
+                if 'step' in inspect.signature(scheduler.__call__).parameters:
                     new_value = scheduler(step=step, where=where)
                 elif (
-                    hasattr(scheduler, "scheduler")
-                    and "step"
-                    in inspect.signature(scheduler.scheduler.__call__).parameters
+                    hasattr(scheduler, 'scheduler')
+                    and 'step' in inspect.signature(scheduler.scheduler.__call__).parameters
                 ):
                     # To handle ValueScaler wrappers
                     new_value = scheduler(step=step, where=where)
@@ -72,9 +71,7 @@ class Optimizer:
         return self.optimizer.zero_grad(*args, **kwargs)
 
 
-def set_default_parameters(
-    scheduler_cfgs: List[DictConfig], all_parameter_names: Set[str]
-) -> None:
+def set_default_parameters(scheduler_cfgs: List[DictConfig], all_parameter_names: Set[str]) -> None:
     """Set up the "default" scheduler with the right parameters.
 
     Args:
@@ -86,9 +83,7 @@ def set_default_parameters(
         all_parameter_names: Names of all the parameters to consider.
     """
     constraints = [
-        scheduler_cfg.parameter_names
-        for scheduler_cfg in scheduler_cfgs
-        if scheduler_cfg.parameter_names is not None
+        scheduler_cfg.parameter_names for scheduler_cfg in scheduler_cfgs if scheduler_cfg.parameter_names is not None
     ]
     if len(constraints) == 0:
         default_params = set(all_parameter_names)
@@ -99,12 +94,12 @@ def set_default_parameters(
         if scheduler_cfg.parameter_names is None:
             scheduler_cfg.parameter_names = default_params
             default_count += 1
-    assert default_count <= 1, "Only one scheduler per option can be default"
+    assert default_count <= 1, 'Only one scheduler per option can be default'
     if default_count == 0:
         # No default scheduler specified, add a default, but without any scheduler
         # for that option
         # pyrefly: ignore [bad-argument-type]
-        scheduler_cfgs.append({"parameter_names": default_params})
+        scheduler_cfgs.append({'parameter_names': default_params})
 
 
 def name_constraints_to_parameters(
@@ -150,21 +145,17 @@ def map_scheduler_cfgs_to_param_groups(
     schedulers = []
     param_groups = []
     for scheduler_cfgs in scheduler_cfgs_per_param_group:
-        param_constraints = [
-            scheduler_cfg["parameter_names"] for scheduler_cfg in scheduler_cfgs
-        ]
-        matching_parameters = name_constraints_to_parameters(
-            param_constraints, named_parameters
-        )
+        param_constraints = [scheduler_cfg['parameter_names'] for scheduler_cfg in scheduler_cfgs]
+        matching_parameters = name_constraints_to_parameters(param_constraints, named_parameters)
         if len(matching_parameters) == 0:  # If no overlap of parameters, skip
             continue
         schedulers_for_group = {
-            scheduler_cfg["option"]: scheduler_cfg["scheduler"]
+            scheduler_cfg['option']: scheduler_cfg['scheduler']
             for scheduler_cfg in scheduler_cfgs
-            if "option" in scheduler_cfg
+            if 'option' in scheduler_cfg
         }
         schedulers.append(schedulers_for_group)
-        param_groups.append({"params": matching_parameters})
+        param_groups.append({'params': matching_parameters})
     return schedulers, param_groups
 
 
@@ -178,15 +169,15 @@ def validate_param_group_params(param_groups: List[Dict], model: nn.Module):
     """
     for pg in param_groups:
         # no param should be repeated within a group
-        assert len(pg["params"]) == len(set(pg["params"]))
-    parameters = [set(param_group["params"]) for param_group in param_groups]
+        assert len(pg['params']) == len(set(pg['params']))
+    parameters = [set(param_group['params']) for param_group in param_groups]
     model_parameters = {parameter for _, parameter in model.named_parameters()}
     for p1, p2 in itertools.permutations(parameters, 2):
-        assert p1.isdisjoint(p2), "Scheduler generated param_groups should be disjoint"
+        assert p1.isdisjoint(p2), 'Scheduler generated param_groups should be disjoint'
     assert set.union(*parameters) == model_parameters, (
-        "Scheduler generated param_groups must include all parameters of the model."
-        f" Found {len(set.union(*parameters))} params whereas model has"
-        f" {len(model_parameters)} params"
+        'Scheduler generated param_groups must include all parameters of the model.'
+        f' Found {len(set.union(*parameters))} params whereas model has'
+        f' {len(model_parameters)} params'
     )
 
 
@@ -208,17 +199,12 @@ def unix_module_cls_pattern_to_parameter_names(
     for module_cls_name in filter_module_cls_names:
         module_cls = hydra.utils.get_class(module_cls_name)
         if module_cls not in module_cls_to_param_names:
-            raise AssertionError(
-                f"module_cls_name {module_cls_name} does not "
-                "match any classes in the model"
-            )
+            raise AssertionError(f'module_cls_name {module_cls_name} does not match any classes in the model')
         matching_parameters = module_cls_to_param_names[module_cls]
         assert len(matching_parameters) > 0, (
-            f"module_cls_name {module_cls_name} does not contain any parameters in the model"
+            f'module_cls_name {module_cls_name} does not contain any parameters in the model'
         )
-        logging.info(
-            f"Matches for module_cls_name [{module_cls_name}]: {matching_parameters} "
-        )
+        logging.info(f'Matches for module_cls_name [{module_cls_name}]: {matching_parameters} ')
         allowed_parameter_names.append(matching_parameters)
     # pyrefly: ignore [bad-argument-type]
     return set.union(*allowed_parameter_names)
@@ -242,10 +228,8 @@ def unix_param_pattern_to_parameter_names(
     allowed_parameter_names = []
     for param_name in filter_param_names:
         matching_parameters = set(fnmatch.filter(parameter_names, param_name))
-        assert len(matching_parameters) >= 1, (
-            f"param_name {param_name} does not match any parameters in the model"
-        )
-        logging.info(f"Matches for param_name [{param_name}]: {matching_parameters}")
+        assert len(matching_parameters) >= 1, f'param_name {param_name} does not match any parameters in the model'
+        logging.info(f'Matches for param_name [{param_name}]: {matching_parameters}')
         allowed_parameter_names.append(matching_parameters)
     return set.union(*allowed_parameter_names)
 
@@ -261,18 +245,16 @@ def _unix_pattern_to_parameter_names(
         scheduler_cfg: The config for the scheduler
         parameter_names: The set of all parameter names which will be filtered
     """
-    if "param_names" not in scheduler_cfg and "module_cls_names" not in scheduler_cfg:
+    if 'param_names' not in scheduler_cfg and 'module_cls_names' not in scheduler_cfg:
         return None
     # pyrefly: ignore [missing-attribute]
     return unix_param_pattern_to_parameter_names(
         # pyrefly: ignore [bad-argument-type]
-        scheduler_cfg.get("param_names"),
+        scheduler_cfg.get('param_names'),
         # pyrefly: ignore [bad-argument-type]
         parameter_names,
     ).union(
-        unix_module_cls_pattern_to_parameter_names(
-            scheduler_cfg.get("module_cls_names"), module_cls_to_param_names
-        )
+        unix_module_cls_pattern_to_parameter_names(scheduler_cfg.get('module_cls_names'), module_cls_to_param_names)
     )
 
 
@@ -338,22 +320,14 @@ def construct_optimizer(
     if param_allowlist is None:
         param_allowlist = {name for name, _ in model.named_parameters()}
 
-    named_parameters = {
-        name: param
-        for name, param in model.named_parameters()
-        if name in param_allowlist
-    }
+    named_parameters = {name: param for name, param in model.named_parameters() if name in param_allowlist}
 
     if not options_conf:
         optimizer = hydra.utils.instantiate(optimizer_conf, named_parameters.values())
         return Optimizer(optimizer)
 
-    all_parameter_names = {
-        name for name, _ in model.named_parameters() if name in param_allowlist
-    }
-    module_cls_to_all_param_names = get_module_cls_to_param_names(
-        model, param_allowlist
-    )
+    all_parameter_names = {name for name, _ in model.named_parameters() if name in param_allowlist}
+    module_cls_to_all_param_names = get_module_cls_to_param_names(model, param_allowlist)
 
     scheduler_cfgs_per_option = hydra.utils.instantiate(options_conf)
     all_scheduler_cfgs = []
@@ -369,9 +343,7 @@ def construct_optimizer(
     if param_group_modifiers_conf:
         for custom_param_modifier in param_group_modifiers_conf:
             custom_param_modifier = hydra.utils.instantiate(custom_param_modifier)
-            all_scheduler_cfgs = custom_param_modifier(
-                scheduler_cfgs=all_scheduler_cfgs, model=model
-            )
+            all_scheduler_cfgs = custom_param_modifier(scheduler_cfgs=all_scheduler_cfgs, model=model)
     schedulers, param_groups = map_scheduler_cfgs_to_param_groups(
         # pyrefly: ignore [bad-argument-type]
         all_scheduler_cfgs,
@@ -385,9 +357,9 @@ def construct_optimizer(
 
 
 def get_full_parameter_name(module_name, param_name):
-    if module_name == "":
+    if module_name == '':
         return param_name
-    return f"{module_name}.{param_name}"
+    return f'{module_name}.{param_name}'
 
 
 class GradientClipper:
@@ -404,9 +376,7 @@ class GradientClipper:
         if self.max_norm is None:
             return  # no-op
 
-        nn.utils.clip_grad_norm_(
-            model.parameters(), max_norm=self.max_norm, norm_type=self.norm_type
-        )
+        nn.utils.clip_grad_norm_(model.parameters(), max_norm=self.max_norm, norm_type=self.norm_type)
 
 
 class ValueScaler:
@@ -427,7 +397,7 @@ def rgetattr(obj, rattrs: str = None):
     """
     if rattrs is None:
         return obj
-    attrs = rattrs.split(".")
+    attrs = rattrs.split('.')
     for attr in attrs:
         obj = getattr(obj, attr)
     return obj
@@ -464,9 +434,7 @@ def layer_decay_param_modifier(
     # pyrefly: ignore [bad-argument-type]
     model = rgetattr(model, apply_to)
     num_layers = model.get_num_layers() + 1
-    layer_decays = [
-        layer_decay_value ** (num_layers - i) for i in range(num_layers + 1)
-    ]
+    layer_decays = [layer_decay_value ** (num_layers - i) for i in range(num_layers + 1)]
     if layer_decay_min is not None:
         layer_decays = [max(val, layer_decay_min) for val in layer_decays]
     final_scheduler_cfgs = []
@@ -475,13 +443,13 @@ def layer_decay_param_modifier(
         curr_cfg_group = []
         # scheduler_cfg_group is a list of dictionaries
         for scheduler_cfg in scheduler_cfg_group:
-            if scheduler_cfg["option"] != "lr":
+            if scheduler_cfg['option'] != 'lr':
                 curr_cfg_group.append(scheduler_cfg)
                 continue
             # Need sorted so that the list of parameter names is deterministic and consistent
             # across re-runs of this job. Else it was causing issues with loading the optimizer
             # state during a job restart
-            parameter_names = sorted(scheduler_cfg["parameter_names"])
+            parameter_names = sorted(scheduler_cfg['parameter_names'])
 
             # Only want one cfg group per layer
             layer_cfg_groups = {}
@@ -493,22 +461,20 @@ def layer_decay_param_modifier(
                     this_scale = layer_decays[layer_id]
                     # Overrides
                     for override in overrides:
-                        if fnmatch.fnmatchcase(param_name, override["pattern"]):
-                            this_scale = float(override["value"])
-                            layer_id = override["pattern"]
+                        if fnmatch.fnmatchcase(param_name, override['pattern']):
+                            this_scale = float(override['value'])
+                            layer_id = override['pattern']
                             break
 
                 if layer_id not in layer_cfg_groups:
                     curr_param = {
-                        "option": scheduler_cfg["option"],
-                        "scheduler": ValueScaler(
-                            scheduler_cfg["scheduler"], this_scale
-                        ),
-                        "parameter_names": {param_name},
+                        'option': scheduler_cfg['option'],
+                        'scheduler': ValueScaler(scheduler_cfg['scheduler'], this_scale),
+                        'parameter_names': {param_name},
                     }
                 else:
                     curr_param = layer_cfg_groups[layer_id]
-                    curr_param["parameter_names"].add(param_name)
+                    curr_param['parameter_names'].add(param_name)
                 layer_cfg_groups[layer_id] = curr_param
 
             for layer_cfg in layer_cfg_groups.values():

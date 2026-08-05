@@ -31,13 +31,9 @@ from PIL import Image, ImageDraw
 def max_memory_allocated():
     max_memory_allocated_bytes = torch.cuda.max_memory_allocated()
     _, total_memory = torch.cuda.mem_get_info()
-    max_memory_allocated_percentage = int(
-        100 * (max_memory_allocated_bytes / total_memory)
-    )
+    max_memory_allocated_percentage = int(100 * (max_memory_allocated_bytes / total_memory))
     max_memory_allocated_bytes = max_memory_allocated_bytes >> 20
-    print(
-        f"max_memory_allocated_bytes: {max_memory_allocated_bytes}MiB or {max_memory_allocated_percentage}%"
-    )
+    print(f'max_memory_allocated_bytes: {max_memory_allocated_bytes}MiB or {max_memory_allocated_percentage}%')
 
 
 def synthesize_video_data(
@@ -49,9 +45,7 @@ def synthesize_video_data(
     height: int,
     n_frames: int,
 ):
-    circle_colors = [
-        tuple(np.random.randint(0, 256, size=3).tolist()) for _ in range(num_objects)
-    ]
+    circle_colors = [tuple(np.random.randint(0, 256, size=3).tolist()) for _ in range(num_objects)]
 
     if os.path.exists(out_dir):
         shutil.rmtree(out_dir)
@@ -67,9 +61,9 @@ def synthesize_video_data(
         positions.append([px, py])
         velocities.append([vx, vy])
 
-    print(f"Generate {n_frames} frames with {num_objects} objects")
+    print(f'Generate {n_frames} frames with {num_objects} objects')
     for i in range(n_frames):
-        img = Image.new("RGB", (width, height), (0, 0, 0))
+        img = Image.new('RGB', (width, height), (0, 0, 0))
         draw = ImageDraw.Draw(img)
         for obj_idx in range(num_objects):
             x, y = positions[obj_idx]
@@ -91,48 +85,46 @@ def synthesize_video_data(
                 vy *= -1
             velocities[obj_idx] = [vx, vy]
 
-        img.save(os.path.join(out_dir, f"{i:03d}.jpg"))
+        img.save(os.path.join(out_dir, f'{i:03d}.jpg'))
 
 
 def profiler_runner(fn, profile_save_dir=None, profile_end_frame=-1, *args, **kwargs):
     if profile_save_dir is None:
-        profile_save_dir = os.path.expanduser("~/traces")
+        profile_save_dir = os.path.expanduser('~/traces')
 
-    os.environ["ENABLE_PROFILING"] = "1"
-    os.environ["PROFILE_SAVE_DIR"] = profile_save_dir
+    os.environ['ENABLE_PROFILING'] = '1'
+    os.environ['PROFILE_SAVE_DIR'] = profile_save_dir
     if profile_end_frame >= 0:
-        os.environ["PROFILE_END_FRAME"] = str(profile_end_frame)
+        os.environ['PROFILE_END_FRAME'] = str(profile_end_frame)
 
-    print(f"Profiling enabled. Traces will be saved to: {profile_save_dir}")
+    print(f'Profiling enabled. Traces will be saved to: {profile_save_dir}')
     if profile_end_frame >= 0:
-        print(f"Profiling will stop at frame: {profile_end_frame}")
+        print(f'Profiling will stop at frame: {profile_end_frame}')
 
     try:
         result = fn(*args, **kwargs)
     finally:
-        os.environ.pop("ENABLE_PROFILING", None)
-        os.environ.pop("PROFILE_SAVE_DIR", None)
-        os.environ.pop("PROFILE_END_FRAME", None)
+        os.environ.pop('ENABLE_PROFILING', None)
+        os.environ.pop('PROFILE_SAVE_DIR', None)
+        os.environ.pop('PROFILE_END_FRAME', None)
 
     return result
 
 
 def main_loop(model_wrapper, session_id, text_prompt):
-    model_wrapper.handle_request({"type": "reset_session", "session_id": session_id})
+    model_wrapper.handle_request({'type': 'reset_session', 'session_id': session_id})
     model_wrapper.handle_request(
         {
-            "type": "add_prompt",
-            "session_id": session_id,
-            "frame_index": 0,
-            "text": text_prompt,
+            'type': 'add_prompt',
+            'session_id': session_id,
+            'frame_index': 0,
+            'text': text_prompt,
         }
     )
 
     t0 = time.perf_counter()
     frame_count = 0
-    for _response in model_wrapper.handle_stream_request(
-        {"type": "propagate_in_video", "session_id": session_id}
-    ):
+    for _response in model_wrapper.handle_stream_request({'type': 'propagate_in_video', 'session_id': session_id}):
         frame_count += 1
     torch.cuda.synchronize()
     t1 = time.perf_counter()
@@ -160,7 +152,7 @@ def run_test(
     # pyrefly: ignore [bad-function-definition]
     checkpoint_path: str = None,
 ) -> float:
-    torch.autocast(device_type="cuda", dtype=torch.bfloat16).__enter__()
+    torch.autocast(device_type='cuda', dtype=torch.bfloat16).__enter__()
 
     if synthesize_data:
         synthesize_video_data(
@@ -175,53 +167,47 @@ def run_test(
 
     from sam3 import build_sam3_predictor
 
-    print(f"Building {version} model...")
+    print(f'Building {version} model...')
     build_kwargs = dict(
         version=version,
         compile=do_compile,
         async_loading_frames=False,
     )
     if checkpoint_path:
-        build_kwargs["checkpoint_path"] = checkpoint_path
-    if version == "sam3.1":
-        build_kwargs["warm_up"] = do_compile
+        build_kwargs['checkpoint_path'] = checkpoint_path
+    if version == 'sam3.1':
+        build_kwargs['warm_up'] = do_compile
         # pyrefly: ignore [bad-assignment]
-        build_kwargs["max_num_objects"] = num_objects
+        build_kwargs['max_num_objects'] = num_objects
 
     model_wrapper = build_sam3_predictor(**build_kwargs)
 
     # Initialize session
-    response = model_wrapper.handle_request(
-        {"type": "start_session", "resource_path": video_dir}
-    )
-    session_id = response["session_id"]
+    response = model_wrapper.handle_request({'type': 'start_session', 'resource_path': video_dir})
+    session_id = response['session_id']
 
-    print("\nWarm-up round.")
+    print('\nWarm-up round.')
     NUM_WARMUP_TRIES = 3
     fps = 0
     for _ in range(NUM_WARMUP_TRIES):
         fps = max(
-            main_loop(
-                model_wrapper=model_wrapper, session_id=session_id, text_prompt="circle"
-            ),
+            main_loop(model_wrapper=model_wrapper, session_id=session_id, text_prompt='circle'),
             fps,
         )
 
-    print("\nProfile round.")
+    print('\nProfile round.')
     if profile:
         profiler_runner(
             main_loop,
-            profile_save_dir=profile_save_dir or os.path.expanduser("~/traces"),
+            profile_save_dir=profile_save_dir or os.path.expanduser('~/traces'),
             profile_end_frame=profile_end_frame,
             model_wrapper=model_wrapper,
             session_id=session_id,
-            text_prompt="circle",
+            text_prompt='circle',
         )
     else:
         fps = max(
-            main_loop(
-                model_wrapper=model_wrapper, session_id=session_id, text_prompt="circle"
-            ),
+            main_loop(model_wrapper=model_wrapper, session_id=session_id, text_prompt='circle'),
             fps,
         )
 
@@ -229,63 +215,57 @@ def run_test(
     for i in range(NUM_TRIES):
         torch.cuda.empty_cache()
         torch.cuda.reset_peak_memory_stats()
-        print(f"\nTiming round {i + 1} ")
+        print(f'\nTiming round {i + 1} ')
         fps = max(
-            main_loop(
-                model_wrapper=model_wrapper, session_id=session_id, text_prompt="circle"
-            ),
+            main_loop(model_wrapper=model_wrapper, session_id=session_id, text_prompt='circle'),
             fps,
         )
-        print(f"Frames per second (FPS): {fps:.2f}")
+        print(f'Frames per second (FPS): {fps:.2f}')
         max_memory_allocated()
 
     if synthesize_data:
-        print("\nDeleting temporary video directory.")
+        print('\nDeleting temporary video directory.')
         shutil.rmtree(video_dir)
 
     return fps
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     username = getpass.getuser()
-    os.environ["TORCHINDUCTOR_CACHE_DIR"] = f"/tmp/torchinductor_cache_{username}"
-    os.environ["USE_PERFLIB"] = "1"
+    os.environ['TORCHINDUCTOR_CACHE_DIR'] = f'/tmp/torchinductor_cache_{username}'
+    os.environ['USE_PERFLIB'] = '1'
 
-    parser = argparse.ArgumentParser(description="SAM3 Speed Test")
+    parser = argparse.ArgumentParser(description='SAM3 Speed Test')
     parser.add_argument(
-        "--version",
+        '--version',
         type=str,
-        default="sam3.1",
-        choices=["sam3", "sam3.1"],
-        help="Model version (default: sam3.1)",
+        default='sam3.1',
+        choices=['sam3', 'sam3.1'],
+        help='Model version (default: sam3.1)',
     )
     parser.add_argument(
-        "--checkpoint",
+        '--checkpoint',
         type=str,
         default=None,
-        help="Path to checkpoint (auto-downloads from HuggingFace if not provided)",
+        help='Path to checkpoint (auto-downloads from HuggingFace if not provided)',
     )
+    parser.add_argument('--video_dir', type=str, default='/tmp/segment-anything-3/synth_video')
+    parser.add_argument('--num_objects', type=int, default=5)
+    parser.add_argument('--n_frames', type=int, default=50)
+    parser.add_argument('--radius', type=int, default=50)
+    parser.add_argument('--speed', type=int, default=20)
+    parser.add_argument('--width', type=int, default=1024)
+    parser.add_argument('--height', type=int, default=1024)
     parser.add_argument(
-        "--video_dir", type=str, default="/tmp/segment-anything-3/synth_video"
+        '--no-compile',
+        action='store_false',
+        dest='compile',
+        help='Disable torch.compile',
     )
-    parser.add_argument("--num_objects", type=int, default=5)
-    parser.add_argument("--n_frames", type=int, default=50)
-    parser.add_argument("--radius", type=int, default=50)
-    parser.add_argument("--speed", type=int, default=20)
-    parser.add_argument("--width", type=int, default=1024)
-    parser.add_argument("--height", type=int, default=1024)
-    parser.add_argument(
-        "--no-compile",
-        action="store_false",
-        dest="compile",
-        help="Disable torch.compile",
-    )
-    parser.add_argument("--no-torch-profiling", action="store_false", dest="profile")
-    parser.add_argument(
-        "--no-data-synthesis", action="store_false", dest="synthesize_data"
-    )
-    parser.add_argument("--profile-save-dir", type=str, default=None)
-    parser.add_argument("--profile-end-frame", type=int, default=-1)
+    parser.add_argument('--no-torch-profiling', action='store_false', dest='profile')
+    parser.add_argument('--no-data-synthesis', action='store_false', dest='synthesize_data')
+    parser.add_argument('--profile-save-dir', type=str, default=None)
+    parser.add_argument('--profile-end-frame', type=int, default=-1)
 
     args = parser.parse_args()
 

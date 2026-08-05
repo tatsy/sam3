@@ -61,9 +61,7 @@ class Mlp(nn.Module):
         self.fc1 = linear_layer(in_features, hidden_features, bias=bias[0])
         self.act = act_layer()
         self.drop1 = nn.Dropout(drop_probs[0])
-        self.norm = (
-            norm_layer(hidden_features) if norm_layer is not None else nn.Identity()
-        )
+        self.norm = norm_layer(hidden_features) if norm_layer is not None else nn.Identity()
         self.fc2 = linear_layer(hidden_features, out_features, bias=bias[1])
         self.drop2 = nn.Dropout(drop_probs[1])
 
@@ -76,12 +74,10 @@ class Mlp(nn.Module):
         return x
 
 
-def init_t_xy(
-    end_x: int, end_y: int, scale: float = 1.0, offset: int = 0
-) -> Tuple[torch.Tensor, torch.Tensor]:
+def init_t_xy(end_x: int, end_y: int, scale: float = 1.0, offset: int = 0) -> Tuple[torch.Tensor, torch.Tensor]:
     t = torch.arange(end_x * end_y, dtype=torch.float32)
     t_x = (t % end_x).float()
-    t_y = torch.div(t, end_x, rounding_mode="floor").float()
+    t_y = torch.div(t, end_x, rounding_mode='floor').float()
     return t_x * scale + offset, t_y * scale + offset
 
 
@@ -119,11 +115,7 @@ def apply_rotary_enc(
     repeat_freqs_k: bool = False,
 ) -> Tuple[torch.Tensor, torch.Tensor]:
     xq_ = torch.view_as_complex(xq.float().reshape(*xq.shape[:-1], -1, 2))
-    xk_ = (
-        torch.view_as_complex(xk.float().reshape(*xk.shape[:-1], -1, 2))
-        if xk.shape[-2] != 0
-        else None
-    )
+    xk_ = torch.view_as_complex(xk.float().reshape(*xk.shape[:-1], -1, 2)) if xk.shape[-2] != 0 else None
     freqs_cis = reshape_for_broadcast(freqs_cis, xq_)
     xq_out = torch.view_as_real(xq_ * freqs_cis).flatten(3)
     if xk_ is None:
@@ -160,9 +152,7 @@ def window_partition(x: Tensor, window_size: int) -> Tuple[Tensor, Tuple[int, in
     return windows, (Hp, Wp)
 
 
-def window_unpartition(
-    windows: Tensor, window_size: int, pad_hw: Tuple[int, int], hw: Tuple[int, int]
-) -> Tensor:
+def window_unpartition(windows: Tensor, window_size: int, pad_hw: Tuple[int, int], hw: Tuple[int, int]) -> Tensor:
     """
     Window unpartition into original sequences and removing padding.
     Args:
@@ -176,9 +166,7 @@ def window_unpartition(
     Hp, Wp = pad_hw
     H, W = hw
     B = windows.shape[0] // (Hp * Wp // window_size // window_size)
-    x = windows.reshape(
-        B, Hp // window_size, Wp // window_size, window_size, window_size, -1
-    )
+    x = windows.reshape(B, Hp // window_size, Wp // window_size, window_size, window_size, -1)
     x = x.permute(0, 1, 3, 2, 4, 5).reshape(B, Hp, Wp, -1)
 
     if Hp > H or Wp > W:
@@ -204,7 +192,7 @@ def get_rel_pos(q_size: int, k_size: int, rel_pos: Tensor) -> Tensor:
         rel_pos_resized = F.interpolate(
             rel_pos.reshape(1, rel_pos.shape[0], -1).permute(0, 2, 1),
             size=max_rel_dist,
-            mode="linear",
+            mode='linear',
             align_corners=False,
         )
         rel_pos_resized = rel_pos_resized.reshape(-1, max_rel_dist).permute(1, 0)
@@ -254,14 +242,14 @@ def get_abs_pos(
     if size != h or size != w:
         new_abs_pos = abs_pos.reshape(1, size, size, -1).permute(0, 3, 1, 2)
         if tiling:
-            new_abs_pos = new_abs_pos.tile(
-                [1, 1] + [x // y + 1 for x, y in zip((h, w), new_abs_pos.shape[2:])]
-            )[:, :, :h, :w]
+            new_abs_pos = new_abs_pos.tile([1, 1] + [x // y + 1 for x, y in zip((h, w), new_abs_pos.shape[2:])])[
+                :, :, :h, :w
+            ]
         else:
             new_abs_pos = F.interpolate(
                 new_abs_pos,
                 size=(h, w),
-                mode="bicubic",
+                mode='bicubic',
                 align_corners=False,
             )
 
@@ -311,7 +299,7 @@ def concat_rel_pos(
     q_h, q_w = q_hw
     k_h, k_w = k_hw
 
-    assert (q_h == q_w) and (k_h == k_w), "only square inputs supported"
+    assert (q_h == q_w) and (k_h == k_w), 'only square inputs supported'
 
     if relative_coords is not None:
         Rh = rel_pos_h[relative_coords]
@@ -328,8 +316,8 @@ def concat_rel_pos(
     # attn will be divided by new_scale, but we want to divide q by old_scale
     scale_ratio = new_scale / old_scale
 
-    rel_h = torch.einsum("bhwc,hkc->bhwk", r_q, Rh) * new_scale  # (B, q_h, q_w, k_h)
-    rel_w = torch.einsum("bhwc,wkc->bhwk", r_q, Rw) * new_scale  # (B, q_h, q_w, k_w)
+    rel_h = torch.einsum('bhwc,hkc->bhwk', r_q, Rh) * new_scale  # (B, q_h, q_w, k_h)
+    rel_w = torch.einsum('bhwc,wkc->bhwk', r_q, Rw) * new_scale  # (B, q_h, q_w, k_w)
 
     eye_h = torch.eye(k_h, dtype=q.dtype, device=q.device)
     eye_w = torch.eye(k_w, dtype=q.dtype, device=q.device)
@@ -338,9 +326,7 @@ def concat_rel_pos(
     eye_w = eye_w.view(1, 1, k_w, k_w).expand([B, k_h, k_w, k_w])
 
     q = torch.cat([r_q * scale_ratio, rel_h, rel_w], dim=-1).view(B, q_h * q_w, -1)
-    k = torch.cat([k.view(B, k_h, k_w, -1), eye_h, eye_w], dim=-1).view(
-        B, k_h * k_w, -1
-    )
+    k = torch.cat([k.view(B, k_h, k_w, -1), eye_h, eye_w], dim=-1).view(B, k_h * k_w, -1)
 
     return q, k
 
@@ -460,14 +446,10 @@ class Attention(nn.Module):
             return
 
         assert self.input_size is not None
-        assert self.cls_token is False, "not supported"
+        assert self.cls_token is False, 'not supported'
         # initialize relative positional embeddings
-        self.rel_pos_h = nn.Parameter(
-            torch.zeros(2 * self.input_size[0] - 1, self.head_dim)
-        )
-        self.rel_pos_w = nn.Parameter(
-            torch.zeros(2 * self.input_size[1] - 1, self.head_dim)
-        )
+        self.rel_pos_h = nn.Parameter(torch.zeros(2 * self.input_size[0] - 1, self.head_dim))
+        self.rel_pos_w = nn.Parameter(torch.zeros(2 * self.input_size[1] - 1, self.head_dim))
 
         if not rel_pos_zero_init:
             trunc_normal_(self.rel_pos_h, std=0.02)
@@ -478,7 +460,7 @@ class Attention(nn.Module):
         q_coords = torch.arange(H)[:, None]
         k_coords = torch.arange(W)[None, :]
         relative_coords = (q_coords - k_coords) + (H - 1)
-        self.register_buffer("relative_coords", relative_coords.long())
+        self.register_buffer('relative_coords', relative_coords.long())
 
     def _setup_rope_freqs(self) -> None:
         if not self.use_rope:
@@ -491,7 +473,7 @@ class Attention(nn.Module):
             self.rope_pt_size = self.input_size
 
         if self.use_ve_rope:
-            assert not self.rope_tiled, "not supported"
+            assert not self.rope_tiled, 'not supported'
             self.rope = VisionRotaryEmbeddingVE(
                 dim=self.head_dim // 2,
                 seq_len=self.input_size[0],
@@ -509,19 +491,14 @@ class Attention(nn.Module):
         if self.rope_pt_size != self.input_size and self.rope_tiled:
             assert not self.rope_interp
             # window/tiled rope
-            freqs_cis = self.compute_cis(
-                end_x=self.rope_pt_size[0], end_y=self.rope_pt_size[1]
-            )
+            freqs_cis = self.compute_cis(end_x=self.rope_pt_size[0], end_y=self.rope_pt_size[1])
             # check dims are tileable
             rh, rw = (
                 self.input_size[0] // self.rope_pt_size[0],
                 self.input_size[1] // self.rope_pt_size[1],
             )
             assert rh >= 1, rw >= 1
-            assert (
-                self.input_size[0] % self.rope_pt_size[0] == 0
-                and self.input_size[1] % self.rope_pt_size[1] == 0
-            )
+            assert self.input_size[0] % self.rope_pt_size[0] == 0 and self.input_size[1] % self.rope_pt_size[1] == 0
 
             # restore spatial shape, tile and then flatten spatial dims
             freqs_cis = (
@@ -549,10 +526,10 @@ class Attention(nn.Module):
             cls_freqs_cis = torch.polar(torch.ones_like(t), t)[None, :]
             freqs_cis = torch.cat([cls_freqs_cis, freqs_cis], dim=0)
 
-        self.register_buffer("freqs_cis", freqs_cis)
+        self.register_buffer('freqs_cis', freqs_cis)
         if self.use_rope_real:
-            self.register_buffer("freqs_cis_real", freqs_cis.real)
-            self.register_buffer("freqs_cis_imag", freqs_cis.imag)
+            self.register_buffer('freqs_cis_real', freqs_cis.real)
+            self.register_buffer('freqs_cis_imag', freqs_cis.imag)
 
     def _apply_rope(self, q, k) -> Tuple[Tensor, Tensor]:
         if not self.use_rope:
@@ -622,9 +599,7 @@ class Attention(nn.Module):
             if self.use_fa3:
                 from sam3.perflib.fa3 import flash_attn_func
 
-                x = flash_attn_func(
-                    q.transpose(1, 2), k.transpose(1, 2), v.transpose(1, 2)
-                ).transpose(1, 2)
+                x = flash_attn_func(q.transpose(1, 2), k.transpose(1, 2), v.transpose(1, 2)).transpose(1, 2)
             else:
                 x = F.scaled_dot_product_attention(q, k, v)
         else:
@@ -718,9 +693,7 @@ class Block(nn.Module):
             use_fa3=use_fa3,
             use_rope_real=use_rope_real,
         )
-        self.ls1 = (
-            LayerScale(dim, init_values=init_values) if init_values else nn.Identity()
-        )
+        self.ls1 = LayerScale(dim, init_values=init_values) if init_values else nn.Identity()
         self.drop_path = DropPath(drop_path) if drop_path > 0.0 else nn.Identity()
 
         self.norm2 = norm_layer(dim)
@@ -730,9 +703,7 @@ class Block(nn.Module):
             act_layer=act_layer,
             drop=(dropout, 0.0),
         )
-        self.ls2 = (
-            LayerScale(dim, init_values=init_values) if init_values else nn.Identity()
-        )
+        self.ls2 = LayerScale(dim, init_values=init_values) if init_values else nn.Identity()
         self.dropout = nn.Dropout(dropout)
         self.window_size = window_size
 
@@ -774,7 +745,7 @@ class ViT(nn.Module):
         mlp_ratio: float = 4.0,
         qkv_bias: bool = True,
         drop_path_rate: float = 0.0,
-        norm_layer: Union[Callable[..., nn.Module], str] = "LayerNorm",
+        norm_layer: Union[Callable[..., nn.Module], str] = 'LayerNorm',
         act_layer: Callable[..., nn.Module] = nn.GELU,
         use_abs_pos: bool = True,
         tile_abs_pos: bool = True,
@@ -856,11 +827,9 @@ class ViT(nn.Module):
         self.retain_cls_token = retain_cls_token
         if self.retain_cls_token:
             assert pretrain_use_cls_token
-            assert len(window_block_indexes) == 0, (
-                "windowing not supported with cls token"
-            )
+            assert len(window_block_indexes) == 0, 'windowing not supported with cls token'
 
-            assert sum(self.rel_pos_blocks) == 0, "rel pos not supported with cls token"
+            assert sum(self.rel_pos_blocks) == 0, 'rel pos not supported with cls token'
 
             scale = embed_dim**-0.5
             self.class_embedding = nn.Parameter(scale * torch.randn(1, 1, embed_dim))
@@ -884,9 +853,7 @@ class ViT(nn.Module):
 
         if self.use_abs_pos:
             # Initialize absolute positional embedding with pretrain image size.
-            num_patches = (pretrain_img_size // patch_size) * (
-                pretrain_img_size // patch_size
-            )
+            num_patches = (pretrain_img_size // patch_size) * (pretrain_img_size // patch_size)
             num_positions = (num_patches + 1) if pretrain_use_cls_token else num_patches
             self.pos_embed = nn.Parameter(torch.zeros(1, num_positions, embed_dim))
         else:
@@ -912,11 +879,7 @@ class ViT(nn.Module):
                 window_size=window_size if i in window_block_indexes else 0,
                 input_size=(img_size // patch_size, img_size // patch_size),
                 use_rope=use_rope,
-                rope_pt_size=(
-                    (window_size, window_size)
-                    if rope_pt_size is None
-                    else (rope_pt_size, rope_pt_size)
-                ),
+                rope_pt_size=((window_size, window_size) if rope_pt_size is None else (rope_pt_size, rope_pt_size)),
                 rope_tiled=use_tiled_rope,
                 use_ve_rope=use_ve_rope,
                 rope_interp=use_interp_rope,
@@ -936,11 +899,7 @@ class ViT(nn.Module):
             self.blocks.append(block)
 
         self.return_interm_layers = return_interm_layers
-        self.channel_list = (
-            [embed_dim] * len(self.full_attn_ids)
-            if return_interm_layers
-            else [embed_dim]
-        )
+        self.channel_list = [embed_dim] * len(self.full_attn_ids) if return_interm_layers else [embed_dim]
 
         if self.pos_embed is not None:
             trunc_normal_(self.pos_embed, std=0.02)
@@ -951,9 +910,7 @@ class ViT(nn.Module):
         self.apply(self._init_weights)
 
         if compile_mode is not None:
-            self.forward = torch.compile(
-                self.forward, mode=compile_mode, fullgraph=True
-            )
+            self.forward = torch.compile(self.forward, mode=compile_mode, fullgraph=True)
             if self.use_act_checkpoint and self.training:
                 torch._dynamo.config.optimize_ddp = False
 
@@ -1002,9 +959,7 @@ class ViT(nn.Module):
                 x = checkpoint.checkpoint(blk, x, use_reentrant=False)
             else:
                 x = blk(x)
-            if (i == self.full_attn_ids[-1]) or (
-                self.return_interm_layers and i in self.full_attn_ids
-            ):
+            if (i == self.full_attn_ids[-1]) or (self.return_interm_layers and i in self.full_attn_ids):
                 if i == self.full_attn_ids[-1]:
                     x = self.ln_post(x)
 
@@ -1014,16 +969,12 @@ class ViT(nn.Module):
                 else:
                     assert feats.ndim == 3
                     h = w = math.sqrt(feats.shape[1])
-                    feats = feats.reshape(
-                        feats.shape[0], h, w, feats.shape[-1]
-                    ).permute(0, 3, 1, 2)
+                    feats = feats.reshape(feats.shape[0], h, w, feats.shape[-1]).permute(0, 3, 1, 2)
 
                 if isinstance(tensor_list, NestedTensor):
                     # Optimization, if the mask is all False, just ignore it
                     if mask is not None and mask.any() and masks is None:
-                        masks = F.interpolate(
-                            mask[None].float(), size=feats.shape[-2:]
-                        ).bool()[0]
+                        masks = F.interpolate(mask[None].float(), size=feats.shape[-2:]).bool()[0]
                     outputs.append(NestedTensor(feats, masks))
                 else:
                     outputs.append(feats)
@@ -1034,16 +985,16 @@ class ViT(nn.Module):
         # https://github.com/microsoft/unilm/blob/master/beit/optim_factory.py#L33
         num_layers = self.get_num_layers()
 
-        if layer_name.find("rel_pos") != -1:
+        if layer_name.find('rel_pos') != -1:
             return num_layers + 1
-        elif layer_name.find("ln_pre") != -1:
+        elif layer_name.find('ln_pre') != -1:
             return 0
-        elif layer_name.find("pos_embed") != -1 or layer_name.find("cls_token") != -1:
+        elif layer_name.find('pos_embed') != -1 or layer_name.find('cls_token') != -1:
             return 0
-        elif layer_name.find("patch_embed") != -1:
+        elif layer_name.find('patch_embed') != -1:
             return 0
-        elif layer_name.find("blocks") != -1:
-            return int(layer_name.split("blocks")[1].split(".")[1]) + 1
+        elif layer_name.find('blocks') != -1:
+            return int(layer_name.split('blocks')[1].split('.')[1]) + 1
         else:
             return num_layers + 1
 

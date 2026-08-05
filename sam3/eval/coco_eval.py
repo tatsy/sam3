@@ -34,7 +34,7 @@ from sam3.train.utils.distributed import (
     is_main_process,
 )
 
-RARITY_BUCKETS = {0: "frequent", 1: "common", 2: "medium", 3: "rare"}
+RARITY_BUCKETS = {0: 'frequent', 1: 'common', 2: 'medium', 3: 'rare'}
 
 
 class CocoEvaluator:
@@ -74,7 +74,7 @@ class CocoEvaluator:
         """
         # coco_gt = copy.deepcopy(coco_gt)
         self.coco_gts = [coco_gt] if not isinstance(coco_gt, list) else coco_gt
-        assert len(maxdets) == 3, f"expecting 3 detection threshold, got {len(maxdets)}"
+        assert len(maxdets) == 3, f'expecting 3 detection threshold, got {len(maxdets)}'
 
         self.use_normalized_areas = use_normalized_areas
         self.iou_types = iou_types
@@ -87,7 +87,7 @@ class CocoEvaluator:
             if is_main_process():
                 if not os.path.exists(self.dump_dir):
                     os.makedirs(self.dump_dir, exist_ok=True)
-                    logging.info(f"Create the folder: {dump_dir}")
+                    logging.info(f'Create the folder: {dump_dir}')
 
         self.initialized = False
 
@@ -104,7 +104,7 @@ class CocoEvaluator:
             if is_main_process():
                 if not os.path.exists(self.metrics_dump_dir):
                     os.makedirs(self.metrics_dump_dir, exist_ok=True)
-                    logging.info(f"Create the folder: {metrics_dump_dir}")
+                    logging.info(f'Create the folder: {metrics_dump_dir}')
 
     def _lazy_init(self, coco_cls=COCO):
         if self.initialized:
@@ -112,10 +112,7 @@ class CocoEvaluator:
 
         self.initialized = True
 
-        self.coco_gts = [
-            coco_cls(g_pathmgr.get_local_path(gt)) if isinstance(gt, str) else gt
-            for gt in self.coco_gts
-        ]
+        self.coco_gts = [coco_cls(g_pathmgr.get_local_path(gt)) if isinstance(gt, str) else gt for gt in self.coco_gts]
 
         self.reset()
 
@@ -127,32 +124,26 @@ class CocoEvaluator:
             if self.all_exhaustive_only:
                 for coco_gt in self.coco_gts[1:]:
                     exclude_img_ids = exclude_img_ids.union(
-                        {
-                            img["id"]
-                            for img in coco_gt.dataset["images"]
-                            if not img["is_instance_exhaustive"]
-                        }
+                        {img['id'] for img in coco_gt.dataset['images'] if not img['is_instance_exhaustive']}
                     )
             # we only eval on instance exhaustive queries
             self.eval_img_ids = [
-                img["id"]
-                for img in self.coco_gts[0].dataset["images"]
-                if (img["is_instance_exhaustive"] and img["id"] not in exclude_img_ids)
+                img['id']
+                for img in self.coco_gts[0].dataset['images']
+                if (img['is_instance_exhaustive'] and img['id'] not in exclude_img_ids)
             ]
 
         self.rarity_buckets = None
         if self.average_by_rarity:
             self.rarity_buckets = defaultdict(list)
-            eval_img_ids_set = (
-                set(self.eval_img_ids) if self.eval_img_ids is not None else None
-            )
-            for img in self.coco_gts[0].dataset["images"]:
-                if self.eval_img_ids is not None and img["id"] not in eval_img_ids_set:
+            eval_img_ids_set = set(self.eval_img_ids) if self.eval_img_ids is not None else None
+            for img in self.coco_gts[0].dataset['images']:
+                if self.eval_img_ids is not None and img['id'] not in eval_img_ids_set:
                     continue
-                self.rarity_buckets[img["rarity"]].append(img["id"])
-            print("Rarity buckets sizes:")
+                self.rarity_buckets[img['rarity']].append(img['id'])
+            print('Rarity buckets sizes:')
             for k, v in self.rarity_buckets.items():
-                print(f"{k}: {len(v)}")
+                print(f'{k}: {len(v)}')
 
     def set_sync_device(self, device: torch.device) -> Any:
         # pyre-fixme[16]: `CocoEvaluator` has no attribute `_sync_device`.
@@ -179,11 +170,9 @@ class CocoEvaluator:
             all_scorings = []
             for cur_coco_gt, cur_coco_eval in zip(self.coco_gts, self.coco_evals):
                 # suppress pycocotools prints
-                with open(os.devnull, "w") as devnull:
+                with open(os.devnull, 'w') as devnull:
                     with contextlib.redirect_stdout(devnull):
-                        coco_dt = (
-                            self._loadRes(cur_coco_gt, results) if results else COCO()
-                        )
+                        coco_dt = self._loadRes(cur_coco_gt, results) if results else COCO()
 
                 coco_eval = cur_coco_eval[iou_type]
 
@@ -205,22 +194,22 @@ class CocoEvaluator:
 
         # Currently we don't support Oracle Phrase AP.
         # To implement it, we likely need to modify the cpp code since the eval_image type is opaque
-        raise RuntimeError("Not implemented")
+        raise RuntimeError('Not implemented')
 
     def _dump(self, results):
         if self.dump is not None:
             dumped_results = copy.deepcopy(results)
             for r in dumped_results:
-                if "bbox" not in self.iou_types and "bbox" in r:
-                    del r["bbox"]
-                elif "bbox" in r:
-                    r["bbox"] = [round(coord, 5) for coord in r["bbox"]]
-                r["score"] = round(r["score"], 5)
+                if 'bbox' not in self.iou_types and 'bbox' in r:
+                    del r['bbox']
+                elif 'bbox' in r:
+                    r['bbox'] = [round(coord, 5) for coord in r['bbox']]
+                r['score'] = round(r['score'], 5)
             self.dump.extend(dumped_results)
 
     def synchronize_between_processes(self):
         self._lazy_init()
-        logging.info("Coco evaluator: Synchronizing between processes")
+        logging.info('Coco evaluator: Synchronizing between processes')
         for iou_type in self.iou_types:
             if len(self.eval_imgs[iou_type]) > 0:
                 self.eval_imgs[iou_type] = np.concatenate(self.eval_imgs[iou_type], 2)
@@ -238,9 +227,9 @@ class CocoEvaluator:
                 metrics_dump_dir=self.metrics_dump_dir,
             )
         if self.dump is not None:
-            dumped_file = Path(self.dump_dir) / f"coco_predictions_{get_rank()}.json"
-            logging.info(f"COCO evaluator: Dumping local predictions to {dumped_file}")
-            with g_pathmgr.open(str(dumped_file), "w") as f:
+            dumped_file = Path(self.dump_dir) / f'coco_predictions_{get_rank()}.json'
+            logging.info(f'COCO evaluator: Dumping local predictions to {dumped_file}')
+            with g_pathmgr.open(str(dumped_file), 'w') as f:
                 json.dump(self.dump, f)
 
             # if self.gather_pred_via_filesys:
@@ -251,9 +240,7 @@ class CocoEvaluator:
 
     def accumulate(self, imgIds=None):
         self._lazy_init()
-        logging.info(
-            f"Coco evaluator: Accumulating on {len(imgIds) if imgIds is not None else 'all'} images"
-        )
+        logging.info(f'Coco evaluator: Accumulating on {len(imgIds) if imgIds is not None else "all"} images')
         if not is_main_process():
             return
 
@@ -272,9 +259,7 @@ class CocoEvaluator:
                 catIds = p.catIds if p.useCats else [-1]
                 coco_eval.evalImgs = list(
                     np.asarray(coco_eval.evalImgs)
-                    .reshape(len(catIds), len(p.areaRng), len(old_img_ids))[
-                        ..., id_mask
-                    ]
+                    .reshape(len(catIds), len(p.areaRng), len(old_img_ids))[..., id_mask]
                     .flatten()
                 )
                 accumulate(coco_eval, use_self_eval=self.use_self_evaluate)
@@ -283,7 +268,7 @@ class CocoEvaluator:
 
     def summarize(self):
         self._lazy_init()
-        logging.info("Coco evaluator: Summarizing")
+        logging.info('Coco evaluator: Summarizing')
         if not is_main_process():
             return {}
 
@@ -291,15 +276,15 @@ class CocoEvaluator:
         if self.rarity_buckets is None:
             self.accumulate(self.eval_img_ids)
             for iou_type, coco_eval in self.coco_evals[0].items():
-                print("IoU metric: {}".format(iou_type))
+                print('IoU metric: {}'.format(iou_type))
                 summarize(coco_eval)
 
-            if "bbox" in self.coco_evals[0]:
-                for key, value in zip(*self.coco_evals[0]["bbox"].stats):
-                    outs[f"coco_eval_bbox_{key}"] = value
-            if "segm" in self.coco_evals[0]:
-                for key, value in zip(*self.coco_evals[0]["segm"].stats):
-                    outs[f"coco_eval_masks_{key}"] = value
+            if 'bbox' in self.coco_evals[0]:
+                for key, value in zip(*self.coco_evals[0]['bbox'].stats):
+                    outs[f'coco_eval_bbox_{key}'] = value
+            if 'segm' in self.coco_evals[0]:
+                for key, value in zip(*self.coco_evals[0]['segm'].stats):
+                    outs[f'coco_eval_masks_{key}'] = value
         else:
             total_stats = {}
             all_keys = {}
@@ -307,36 +292,32 @@ class CocoEvaluator:
                 self.accumulate(imgIds=img_list)
                 bucket_name = RARITY_BUCKETS[bucket]
                 for iou_type, coco_eval in self.coco_evals[0].items():
-                    print(f"IoU metric: {iou_type}. Rarity bucket: {bucket_name}")
+                    print(f'IoU metric: {iou_type}. Rarity bucket: {bucket_name}')
                     summarize(coco_eval)
 
-                if "bbox" in self.coco_evals[0]:
-                    if "bbox" not in total_stats:
-                        total_stats["bbox"] = np.zeros_like(
-                            self.coco_evals[0]["bbox"].stats[1]
-                        )
-                        all_keys["bbox"] = self.coco_evals[0]["bbox"].stats[0]
-                    total_stats["bbox"] += self.coco_evals[0]["bbox"].stats[1]
-                    for key, value in zip(*self.coco_evals[0]["bbox"].stats):
-                        outs[f"coco_eval_bbox_{bucket_name}_{key}"] = value
-                if "segm" in self.coco_evals[0]:
-                    if "segm" not in total_stats:
-                        total_stats["segm"] = np.zeros_like(
-                            self.coco_evals[0]["segm"].stats[1]
-                        )
-                        all_keys["segm"] = self.coco_evals[0]["segm"].stats[0]
-                    total_stats["segm"] += self.coco_evals[0]["segm"].stats[1]
-                    for key, value in zip(*self.coco_evals[0]["segm"].stats):
-                        outs[f"coco_eval_masks_{bucket_name}_{key}"] = value
+                if 'bbox' in self.coco_evals[0]:
+                    if 'bbox' not in total_stats:
+                        total_stats['bbox'] = np.zeros_like(self.coco_evals[0]['bbox'].stats[1])
+                        all_keys['bbox'] = self.coco_evals[0]['bbox'].stats[0]
+                    total_stats['bbox'] += self.coco_evals[0]['bbox'].stats[1]
+                    for key, value in zip(*self.coco_evals[0]['bbox'].stats):
+                        outs[f'coco_eval_bbox_{bucket_name}_{key}'] = value
+                if 'segm' in self.coco_evals[0]:
+                    if 'segm' not in total_stats:
+                        total_stats['segm'] = np.zeros_like(self.coco_evals[0]['segm'].stats[1])
+                        all_keys['segm'] = self.coco_evals[0]['segm'].stats[0]
+                    total_stats['segm'] += self.coco_evals[0]['segm'].stats[1]
+                    for key, value in zip(*self.coco_evals[0]['segm'].stats):
+                        outs[f'coco_eval_masks_{bucket_name}_{key}'] = value
 
-            if "bbox" in total_stats:
-                total_stats["bbox"] /= len(self.rarity_buckets)
-                for key, value in zip(all_keys["bbox"], total_stats["bbox"]):
-                    outs[f"coco_eval_bbox_{key}"] = value
-            if "segm" in total_stats:
-                total_stats["segm"] /= len(self.rarity_buckets)
-                for key, value in zip(all_keys["segm"], total_stats["segm"]):
-                    outs[f"coco_eval_masks_{key}"] = value
+            if 'bbox' in total_stats:
+                total_stats['bbox'] /= len(self.rarity_buckets)
+                for key, value in zip(all_keys['bbox'], total_stats['bbox']):
+                    outs[f'coco_eval_bbox_{key}'] = value
+            if 'segm' in total_stats:
+                total_stats['segm'] /= len(self.rarity_buckets)
+                for key, value in zip(all_keys['segm'], total_stats['segm']):
+                    outs[f'coco_eval_masks_{key}'] = value
 
         # if self.dump is not None:
         #     assert self.dump_dir is not None
@@ -352,7 +333,7 @@ class CocoEvaluator:
 
     def compute(self):
         self._lazy_init()
-        return {"": 0.0}
+        return {'': 0.0}
 
     def reset(self, cocoeval_cls=COCOeval):
         self.coco_evals = [{} for _ in range(len(self.coco_gts))]
@@ -372,13 +353,13 @@ class CocoEvaluator:
                         [0.95, 1e5],
                     ]
                     self.coco_evals[i][iou_type].params.areaRngLbl = [
-                        "all",
-                        "tiny",
-                        "small",
-                        "medium",
-                        "large",
-                        "huge",
-                        "whole_image",
+                        'all',
+                        'tiny',
+                        'small',
+                        'medium',
+                        'large',
+                        'huge',
+                        'whole_image',
                     ]
 
         self.img_ids = []
@@ -389,22 +370,22 @@ class CocoEvaluator:
     def write(self, stats):
         self._lazy_init()
         """Write the results in the stats dict"""
-        if "bbox" in self.coco_evals[0]:
-            stats["coco_eval_bbox"] = self.coco_evals[0]["bbox"].stats.tolist()
-        if "segm" in self.coco_evals[0]:
-            stats["coco_eval_masks"] = self.coco_evals[0]["segm"].stats.tolist()
+        if 'bbox' in self.coco_evals[0]:
+            stats['coco_eval_bbox'] = self.coco_evals[0]['bbox'].stats.tolist()
+        if 'segm' in self.coco_evals[0]:
+            stats['coco_eval_masks'] = self.coco_evals[0]['segm'].stats.tolist()
         return stats
 
     def prepare(self, predictions, iou_type):
         self._lazy_init()
-        if iou_type == "bbox":
+        if iou_type == 'bbox':
             return self.prepare_for_coco_detection(predictions)
-        elif iou_type == "segm":
+        elif iou_type == 'segm':
             return self.prepare_for_coco_segmentation(predictions)
-        elif iou_type == "keypoints":
+        elif iou_type == 'keypoints':
             return self.prepare_for_coco_keypoint(predictions)
         else:
-            raise ValueError("Unknown iou type {}".format(iou_type))
+            raise ValueError('Unknown iou type {}'.format(iou_type))
 
     def prepare_for_coco_detection(self, predictions):
         self._lazy_init()
@@ -413,18 +394,18 @@ class CocoEvaluator:
             if len(prediction) == 0:
                 continue
 
-            boxes = prediction["boxes"]
+            boxes = prediction['boxes']
             boxes = convert_to_xywh(boxes).tolist()
-            scores = prediction["scores"].tolist()
-            labels = prediction["labels"].tolist()
+            scores = prediction['scores'].tolist()
+            labels = prediction['labels'].tolist()
 
             coco_results.extend(
                 [
                     {
-                        "image_id": original_id,
-                        "category_id": labels[k],
-                        "bbox": box,
-                        "score": scores[k],
+                        'image_id': original_id,
+                        'category_id': labels[k],
+                        'bbox': box,
+                        'score': scores[k],
                     }
                     for k, box in enumerate(boxes)
                 ]
@@ -439,24 +420,24 @@ class CocoEvaluator:
             if len(prediction) == 0:
                 continue
 
-            scores = prediction["scores"].tolist()
-            labels = prediction["labels"].tolist()
+            scores = prediction['scores'].tolist()
+            labels = prediction['labels'].tolist()
             boundaries, dilated_boundaries = None, None
-            if "boundaries" in prediction:
-                boundaries = prediction["boundaries"]
-                dilated_boundaries = prediction["dilated_boundaries"]
+            if 'boundaries' in prediction:
+                boundaries = prediction['boundaries']
+                dilated_boundaries = prediction['dilated_boundaries']
                 assert dilated_boundaries is not None
                 assert len(scores) == len(boundaries)
 
-            if "masks_rle" in prediction:
-                rles = prediction["masks_rle"]
+            if 'masks_rle' in prediction:
+                rles = prediction['masks_rle']
                 areas = []
                 for rle in rles:
                     cur_area = mask_utils.area(rle)
-                    h, w = rle["size"]
+                    h, w = rle['size']
                     areas.append(cur_area / (h * w))
             else:
-                masks = prediction["masks"]
+                masks = prediction['masks']
 
                 masks = masks > 0.5
                 h, w = masks.shape[-2:]
@@ -468,20 +449,20 @@ class CocoEvaluator:
 
                 # memory clean
                 del masks
-                del prediction["masks"]
+                del prediction['masks']
 
             assert len(areas) == len(rles) == len(scores)
             for k, rle in enumerate(rles):
                 payload = {
-                    "image_id": original_id,
-                    "category_id": labels[k],
-                    "segmentation": rle,
-                    "score": scores[k],
-                    "area": areas[k],
+                    'image_id': original_id,
+                    'category_id': labels[k],
+                    'segmentation': rle,
+                    'score': scores[k],
+                    'area': areas[k],
                 }
                 if boundaries is not None:
-                    payload["boundary"] = boundaries[k]
-                    payload["dilated_boundary"] = dilated_boundaries[k]
+                    payload['boundary'] = boundaries[k]
+                    payload['dilated_boundary'] = dilated_boundaries[k]
 
                 coco_results.append(payload)
 
@@ -494,20 +475,20 @@ class CocoEvaluator:
             if len(prediction) == 0:
                 continue
 
-            boxes = prediction["boxes"]
+            boxes = prediction['boxes']
             boxes = convert_to_xywh(boxes).tolist()
-            scores = prediction["scores"].tolist()
-            labels = prediction["labels"].tolist()
-            keypoints = prediction["keypoints"]
+            scores = prediction['scores'].tolist()
+            labels = prediction['labels'].tolist()
+            keypoints = prediction['keypoints']
             keypoints = keypoints.flatten(start_dim=1).tolist()
 
             coco_results.extend(
                 [
                     {
-                        "image_id": original_id,
-                        "category_id": labels[k],
-                        "keypoints": keypoint,
-                        "score": scores[k],
+                        'image_id': original_id,
+                        'category_id': labels[k],
+                        'keypoints': keypoint,
+                        'score': scores[k],
                     }
                     for k, keypoint in enumerate(keypoints)
                 ]
@@ -563,18 +544,16 @@ def create_common_coco_eval(
     if not is_main_process():
         return
     if metrics_dump_dir is not None:
-        dumped_file = (
-            Path(metrics_dump_dir) / f"coco_eval_img_metrics_{get_rank()}.json"
-        )
-        logging.info(f"COCO evaluator: Dumping local predictions to {dumped_file}")
-        with g_pathmgr.open(str(dumped_file), "w") as f:
+        dumped_file = Path(metrics_dump_dir) / f'coco_eval_img_metrics_{get_rank()}.json'
+        logging.info(f'COCO evaluator: Dumping local predictions to {dumped_file}')
+        with g_pathmgr.open(str(dumped_file), 'w') as f:
             json.dump(eval_imgs.squeeze(), f, default=lambda x: x.tolist())
     img_ids = list(img_ids)
 
     # If some images were not predicted, we need to create dummy detections for them
     missing_img_ids = set(coco_eval.cocoGt.getImgIds()) - set(img_ids)
     if len(missing_img_ids) > 0:
-        print(f"WARNING: {len(missing_img_ids)} images were not predicted!")
+        print(f'WARNING: {len(missing_img_ids)} images were not predicted!')
         coco_eval.cocoDt = COCO()
         coco_eval.params.imgIds = list(missing_img_ids)
         new_img_ids, new_eval_imgs = evaluate(coco_eval, use_self_evaluate)
@@ -603,27 +582,23 @@ def segmentation_prepare(self):
     """
     p = self.params
     if p.useCats:
-        gts = self.cocoGt.loadAnns(
-            self.cocoGt.getAnnIds(imgIds=p.imgIds, catIds=p.catIds)
-        )
-        dts = self.cocoDt.loadAnns(
-            self.cocoDt.getAnnIds(imgIds=p.imgIds, catIds=p.catIds)
-        )
+        gts = self.cocoGt.loadAnns(self.cocoGt.getAnnIds(imgIds=p.imgIds, catIds=p.catIds))
+        dts = self.cocoDt.loadAnns(self.cocoDt.getAnnIds(imgIds=p.imgIds, catIds=p.catIds))
     else:
         gts = self.cocoGt.loadAnns(self.cocoGt.getAnnIds(imgIds=p.imgIds))
         dts = self.cocoDt.loadAnns(self.cocoDt.getAnnIds(imgIds=p.imgIds))
 
     for gt in gts:
-        gt["ignore"] = gt["ignore"] if "ignore" in gt else 0
-        gt["ignore"] = "iscrowd" in gt and gt["iscrowd"]
-        if p.iouType == "keypoints":
-            gt["ignore"] = (gt["num_keypoints"] == 0) or gt["ignore"]
+        gt['ignore'] = gt['ignore'] if 'ignore' in gt else 0
+        gt['ignore'] = 'iscrowd' in gt and gt['iscrowd']
+        if p.iouType == 'keypoints':
+            gt['ignore'] = (gt['num_keypoints'] == 0) or gt['ignore']
     self._gts = defaultdict(list)  # gt for evaluation
     self._dts = defaultdict(list)  # dt for evaluation
     for gt in gts:
-        self._gts[gt["image_id"], gt["category_id"]].append(gt)
+        self._gts[gt['image_id'], gt['category_id']].append(gt)
     for dt in dts:
-        self._dts[dt["image_id"], dt["category_id"]].append(dt)
+        self._dts[dt['image_id'], dt['category_id']].append(dt)
     self.evalImgs = defaultdict(list)  # per-image per-category evaluation results
     self.eval = {}  # accumulated evaluation results
 
@@ -638,10 +613,8 @@ def evaluate(self, use_self_evaluate):
     p = self.params
     # add backward compatibility if useSegm is specified in params
     if p.useSegm is not None:
-        p.iouType = "segm" if p.useSegm == 1 else "bbox"
-        print(
-            "useSegm (deprecated) is not None. Running {} evaluation".format(p.iouType)
-        )
+        p.iouType = 'segm' if p.useSegm == 1 else 'bbox'
+        print('useSegm (deprecated) is not None. Running {} evaluation'.format(p.iouType))
     # print('Evaluate annotation type *{}*'.format(p.iouType))
     p.imgIds = list(np.unique(p.imgIds))
     if p.useCats:
@@ -653,15 +626,11 @@ def evaluate(self, use_self_evaluate):
     # loop through images, area range, max detection number
     catIds = p.catIds if p.useCats else [-1]
 
-    if p.iouType == "segm" or p.iouType == "bbox":
+    if p.iouType == 'segm' or p.iouType == 'bbox':
         computeIoU = self.computeIoU
-    elif p.iouType == "keypoints":
+    elif p.iouType == 'keypoints':
         computeIoU = self.computeOks
-    self.ious = {
-        (imgId, catId): computeIoU(imgId, catId)
-        for imgId in p.imgIds
-        for catId in catIds
-    }
+    self.ious = {(imgId, catId): computeIoU(imgId, catId) for imgId in p.imgIds for catId in catIds}
 
     maxDet = p.maxDets[-1]
     if use_self_evaluate:
@@ -672,9 +641,7 @@ def evaluate(self, use_self_evaluate):
             for imgId in p.imgIds
         ]
         # this is NOT in the pycocotools code, but could be done outside
-        evalImgs = np.asarray(evalImgs).reshape(
-            len(catIds), len(p.areaRng), len(p.imgIds)
-        )
+        evalImgs = np.asarray(evalImgs).reshape(len(catIds), len(p.areaRng), len(p.imgIds))
         return p.imgIds, evalImgs
 
     # <<<< Beginning of code differences with original COCO API
@@ -742,7 +709,7 @@ def loadRes(self, resFile):
     :return: res (obj)         : result api object
     """
     res = COCO()
-    res.dataset["images"] = [img for img in self.dataset["images"]]
+    res.dataset['images'] = [img for img in self.dataset['images']]
 
     if type(resFile) == str:
         anns = json.load(open(resFile))
@@ -750,52 +717,46 @@ def loadRes(self, resFile):
         anns = self.loadNumpyAnnotations(resFile)
     else:
         anns = resFile
-    assert type(anns) == list, "results in not an array of objects"
-    annsImgIds = [ann["image_id"] for ann in anns]
-    assert set(annsImgIds) == (set(annsImgIds) & set(self.getImgIds())), (
-        "Results do not correspond to current coco set"
-    )
-    if "caption" in anns[0]:
-        imgIds = set([img["id"] for img in res.dataset["images"]]) & set(
-            [ann["image_id"] for ann in anns]
-        )
-        res.dataset["images"] = [
-            img for img in res.dataset["images"] if img["id"] in imgIds
-        ]
+    assert type(anns) == list, 'results in not an array of objects'
+    annsImgIds = [ann['image_id'] for ann in anns]
+    assert set(annsImgIds) == (set(annsImgIds) & set(self.getImgIds())), 'Results do not correspond to current coco set'
+    if 'caption' in anns[0]:
+        imgIds = set([img['id'] for img in res.dataset['images']]) & set([ann['image_id'] for ann in anns])
+        res.dataset['images'] = [img for img in res.dataset['images'] if img['id'] in imgIds]
         for id, ann in enumerate(anns):
-            ann["id"] = id + 1
-    elif "bbox" in anns[0] and not anns[0]["bbox"] == []:
-        res.dataset["categories"] = copy.deepcopy(self.dataset["categories"])
+            ann['id'] = id + 1
+    elif 'bbox' in anns[0] and not anns[0]['bbox'] == []:
+        res.dataset['categories'] = copy.deepcopy(self.dataset['categories'])
         for id, ann in enumerate(anns):
-            bb = ann["bbox"]
+            bb = ann['bbox']
             x1, x2, y1, y2 = [bb[0], bb[0] + bb[2], bb[1], bb[1] + bb[3]]
-            if "segmentation" not in ann:
-                ann["segmentation"] = [[x1, y1, x1, y2, x2, y2, x2, y1]]
-            ann["area"] = bb[2] * bb[3]
-            ann["id"] = id + 1
-            ann["iscrowd"] = 0
-    elif "segmentation" in anns[0]:
-        res.dataset["categories"] = copy.deepcopy(self.dataset["categories"])
+            if 'segmentation' not in ann:
+                ann['segmentation'] = [[x1, y1, x1, y2, x2, y2, x2, y1]]
+            ann['area'] = bb[2] * bb[3]
+            ann['id'] = id + 1
+            ann['iscrowd'] = 0
+    elif 'segmentation' in anns[0]:
+        res.dataset['categories'] = copy.deepcopy(self.dataset['categories'])
         for id, ann in enumerate(anns):
             # now only support compressed RLE format as segmentation results
             # ann["area"] = mask_util.area(ann["segmentation"])
             # The following lines are disabled because they are pointless
             #  if not 'bbox' in ann:
             #     ann['bbox'] = maskUtils.toBbox(ann['segmentation'])
-            ann["id"] = id + 1
-            ann["iscrowd"] = 0
-    elif "keypoints" in anns[0]:
-        res.dataset["categories"] = copy.deepcopy(self.dataset["categories"])
+            ann['id'] = id + 1
+            ann['iscrowd'] = 0
+    elif 'keypoints' in anns[0]:
+        res.dataset['categories'] = copy.deepcopy(self.dataset['categories'])
         for id, ann in enumerate(anns):
-            s = ann["keypoints"]
+            s = ann['keypoints']
             x = s[0::3]
             y = s[1::3]
             x0, x1, y0, y1 = np.min(x), np.max(x), np.min(y), np.max(y)
-            ann["area"] = (x1 - x0) * (y1 - y0)
-            ann["id"] = id + 1
-            ann["bbox"] = [x0, y0, x1 - x0, y1 - y0]
+            ann['area'] = (x1 - x0) * (y1 - y0)
+            ann['id'] = id + 1
+            ann['bbox'] = [x0, y0, x1 - x0, y1 - y0]
 
-    res.dataset["annotations"] = anns
+    res.dataset['annotations'] = anns
     res.createIndex()
     return res
 
@@ -814,22 +775,18 @@ def summarize(self):
     Note this functin can *only* be applied on the default parameter setting
     """
 
-    def _summarize(ap=1, iouThr=None, areaRng="all", maxDets=100):
+    def _summarize(ap=1, iouThr=None, areaRng='all', maxDets=100):
         p = self.params
-        iStr = " {:<18} {} @[ IoU={:<9} | area={:>6s} | maxDets={:>3d} ] = {:0.3f}"
-        titleStr = "Average Precision" if ap == 1 else "Average Recall"
-        typeStr = "(AP)" if ap == 1 else "(AR)"
-        iouStr = (
-            "{:0.2f}:{:0.2f}".format(p.iouThrs[0], p.iouThrs[-1])
-            if iouThr is None
-            else "{:0.2f}".format(iouThr)
-        )
+        iStr = ' {:<18} {} @[ IoU={:<9} | area={:>6s} | maxDets={:>3d} ] = {:0.3f}'
+        titleStr = 'Average Precision' if ap == 1 else 'Average Recall'
+        typeStr = '(AP)' if ap == 1 else '(AR)'
+        iouStr = '{:0.2f}:{:0.2f}'.format(p.iouThrs[0], p.iouThrs[-1]) if iouThr is None else '{:0.2f}'.format(iouThr)
 
         aind = [i for i, aRng in enumerate(p.areaRngLbl) if aRng == areaRng]
         mind = [i for i, mDet in enumerate(p.maxDets) if mDet == maxDets]
         if ap == 1:
             # dimension of precision: [TxRxKxAxM]
-            s = self.eval["precision"]
+            s = self.eval['precision']
             # IoU
             if iouThr is not None:
                 t = np.where(iouThr == p.iouThrs)[0]
@@ -837,7 +794,7 @@ def summarize(self):
             s = s[:, :, :, aind, mind]
         else:
             # dimension of recall: [TxKxAxM]
-            s = self.eval["recall"]
+            s = self.eval['recall']
             if iouThr is not None:
                 t = np.where(iouThr == p.iouThrs)[0]
                 s = s[t]
@@ -853,7 +810,7 @@ def summarize(self):
         nb_results = 6 + (len(self.params.areaRng) - 1) * 2
         assert len(self.params.areaRng) == len(self.params.areaRngLbl)
         stats = np.zeros((nb_results,))
-        keys = ["AP", "AP_50", "AP_75"]
+        keys = ['AP', 'AP_50', 'AP_75']
         stats[0] = _summarize(1, maxDets=self.params.maxDets[2])
         stats[1] = _summarize(1, iouThr=0.5, maxDets=self.params.maxDets[2])
         stats[2] = _summarize(1, iouThr=0.75, maxDets=self.params.maxDets[2])
@@ -861,24 +818,24 @@ def summarize(self):
         for area in self.params.areaRngLbl[1:]:
             stats[cur_id] = _summarize(1, areaRng=area, maxDets=self.params.maxDets[2])
             cur_id += 1
-            keys.append(f"AP_{area}")
+            keys.append(f'AP_{area}')
         stats[cur_id] = _summarize(0, maxDets=self.params.maxDets[0])
         cur_id += 1
         stats[cur_id] = _summarize(0, maxDets=self.params.maxDets[1])
         cur_id += 1
         stats[cur_id] = _summarize(0, maxDets=self.params.maxDets[2])
         cur_id += 1
-        keys += ["AR", "AR_50", "AR_75"]
+        keys += ['AR', 'AR_50', 'AR_75']
 
         for area in self.params.areaRngLbl[1:]:
             stats[cur_id] = _summarize(0, areaRng=area, maxDets=self.params.maxDets[2])
             cur_id += 1
-            keys.append(f"AR_{area}")
+            keys.append(f'AR_{area}')
         assert len(stats) == len(keys)
         return keys, stats
 
     if not self.eval:
-        raise Exception("Please run accumulate() first")
+        raise Exception('Please run accumulate() first')
     self.stats = _summarizeDets()
 
 

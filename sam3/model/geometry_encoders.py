@@ -54,14 +54,11 @@ def concat_padded_sequences(seq1, mask1, seq2, mask2, return_index: bool = False
     final_lengths = actual_seq1_lengths + actual_seq2_lengths
     max_length = seq1_length + seq2_length
     concatenated_mask = (
-        torch.arange(max_length, device=seq2.device)[None].repeat(batch_size, 1)
-        >= final_lengths[:, None]
+        torch.arange(max_length, device=seq2.device)[None].repeat(batch_size, 1) >= final_lengths[:, None]
     )
 
     # (max_len, batch_size, hidden_size)
-    concatenated_sequence = torch.zeros(
-        (max_length, batch_size, hidden_size), device=seq2.device, dtype=seq2.dtype
-    )
+    concatenated_sequence = torch.zeros((max_length, batch_size, hidden_size), device=seq2.device, dtype=seq2.dtype)
     concatenated_sequence[:seq1_length, :, :] = seq1
 
     # At this point, the element of seq1 are in the right place
@@ -70,9 +67,7 @@ def concat_padded_sequences(seq1, mask1, seq2, mask2, return_index: bool = False
     index = torch.arange(seq2_length, device=seq2.device)[:, None].repeat(1, batch_size)
     index = index + actual_seq1_lengths[None]
 
-    concatenated_sequence = concatenated_sequence.scatter(
-        0, index[:, :, None].expand(-1, -1, hidden_size), seq2
-    )
+    concatenated_sequence = concatenated_sequence.scatter(0, index[:, :, None].expand(-1, -1, hidden_size), seq2)
 
     if return_index:
         return concatenated_sequence, concatenated_mask, index
@@ -112,11 +107,7 @@ class Prompt:
         mask_labels=None,
     ):
         # Check for null prompt
-        if (
-            box_embeddings is None
-            and point_embeddings is None
-            and mask_embeddings is None
-        ):
+        if box_embeddings is None and point_embeddings is None and mask_embeddings is None:
             self.box_embeddings = None
             self.box_labels = None
             self.box_mask = None
@@ -129,10 +120,8 @@ class Prompt:
             self.mask_labels = None
             return
         # Get sequence lengths and device
-        box_seq_len, point_seq_len, mask_seq_len, bs, device = (
-            self._init_seq_len_and_device(
-                box_embeddings, point_embeddings, mask_embeddings
-            )
+        box_seq_len, point_seq_len, mask_seq_len, bs, device = self._init_seq_len_and_device(
+            box_embeddings, point_embeddings, mask_embeddings
         )
 
         # Initialize embeds, labels, attention masks.
@@ -150,39 +139,27 @@ class Prompt:
         assert box_embeddings is not None and list(box_embeddings.shape[:2]) == [
             box_seq_len,
             bs,
-        ], (
-            f"Wrong dimension for box embeddings. Expected [{box_seq_len}, {bs}, *] got {box_embeddings.shape}"
-        )
+        ], f'Wrong dimension for box embeddings. Expected [{box_seq_len}, {bs}, *] got {box_embeddings.shape}'
         assert box_mask is not None and list(box_mask.shape) == [
             bs,
             box_seq_len,
-        ], (
-            f"Wrong dimension for box mask. Expected [{bs}, {box_seq_len}] got {box_mask.shape}"
-        )
+        ], f'Wrong dimension for box mask. Expected [{bs}, {box_seq_len}] got {box_mask.shape}'
         assert point_embeddings is not None and list(point_embeddings.shape[:2]) == [
             point_seq_len,
             bs,
-        ], (
-            f"Wrong dimension for point embeddings. Expected [{point_seq_len}, {bs}, *] got {point_embeddings.shape}"
-        )
+        ], f'Wrong dimension for point embeddings. Expected [{point_seq_len}, {bs}, *] got {point_embeddings.shape}'
         assert point_mask is not None and list(point_mask.shape) == [
             bs,
             point_seq_len,
-        ], (
-            f"Wrong dimension for point mask. Expected [{bs}, {point_seq_len}] got {point_mask.shape}"
-        )
+        ], f'Wrong dimension for point mask. Expected [{bs}, {point_seq_len}] got {point_mask.shape}'
         assert box_labels is not None and list(box_labels.shape) == [
             box_seq_len,
             bs,
-        ], (
-            f"Wrong dimension for box labels. Expected [{box_seq_len}, {bs}] got {box_labels.shape}"
-        )
+        ], f'Wrong dimension for box labels. Expected [{box_seq_len}, {bs}] got {box_labels.shape}'
         assert point_labels is not None and list(point_labels.shape) == [
             point_seq_len,
             bs,
-        ], (
-            f"Wrong dimension for point labels. Expected [{point_seq_len}, {bs}] got {point_labels.shape}"
-        )
+        ], f'Wrong dimension for point labels. Expected [{point_seq_len}, {bs}] got {point_labels.shape}'
         assert (
             # Allowed to be None, we leave it to the encoder to check for validity before encoding.
             mask_embeddings is None
@@ -191,40 +168,36 @@ class Prompt:
                 mask_seq_len,
                 bs,
             ]
-        ), (
-            f"Wrong dimension for mask embeddings. Expected [{mask_seq_len}, {bs}, *] got {mask_embeddings.shape}"
-        )
+        ), f'Wrong dimension for mask embeddings. Expected [{mask_seq_len}, {bs}, *] got {mask_embeddings.shape}'
         assert mask_mask is None or list(mask_mask.shape) == [
             bs,
             mask_seq_len,
-        ], (
-            f"Wrong dimension for mask attn. mask. Expected [{bs}, {mask_seq_len}] got {mask_mask.shape}"
-        )
+        ], f'Wrong dimension for mask attn. mask. Expected [{bs}, {mask_seq_len}] got {mask_mask.shape}'
 
         # Device checks
         assert box_embeddings is not None and box_embeddings.device == device, (
-            f"Expected box embeddings to be on device {device}, got {box_embeddings.device}"
+            f'Expected box embeddings to be on device {device}, got {box_embeddings.device}'
         )
         assert box_mask is not None and box_mask.device == device, (
-            f"Expected box mask to be on device {device}, got {box_mask.device}"
+            f'Expected box mask to be on device {device}, got {box_mask.device}'
         )
         assert box_labels is not None and box_labels.device == device, (
-            f"Expected box labels to be on device {device}, got {box_labels.device}"
+            f'Expected box labels to be on device {device}, got {box_labels.device}'
         )
         assert point_embeddings is not None and point_embeddings.device == device, (
-            f"Expected point embeddings to be on device {device}, got {point_embeddings.device}"
+            f'Expected point embeddings to be on device {device}, got {point_embeddings.device}'
         )
         assert point_mask is not None and point_mask.device == device, (
-            f"Expected point mask to be on device {device}, got {point_mask.device}"
+            f'Expected point mask to be on device {device}, got {point_mask.device}'
         )
         assert point_labels is not None and point_labels.device == device, (
-            f"Expected point labels to be on device {device}, got {point_labels.device}"
+            f'Expected point labels to be on device {device}, got {point_labels.device}'
         )
         assert mask_embeddings is None or mask_embeddings.device == device, (
-            f"Expected mask embeddings to be on device {device}, got {mask_embeddings.device}"
+            f'Expected mask embeddings to be on device {device}, got {mask_embeddings.device}'
         )
         assert mask_mask is None or mask_mask.device == device, (
-            f"Expected mask attn. mask to be on device {device}, got {mask_mask.device}"
+            f'Expected mask attn. mask to be on device {device}, got {mask_mask.device}'
         )
 
         self.box_embeddings = box_embeddings
@@ -237,9 +210,7 @@ class Prompt:
         self.mask_labels = mask_labels
         self.mask_mask = mask_mask
 
-    def _init_seq_len_and_device(
-        self, box_embeddings, point_embeddings, mask_embeddings
-    ):
+    def _init_seq_len_and_device(self, box_embeddings, point_embeddings, mask_embeddings):
         box_seq_len = point_seq_len = mask_seq_len = 0
         bs = None
         device = None
@@ -252,14 +223,12 @@ class Prompt:
             point_seq_len = point_embeddings.shape[0]
             if bs is not None:
                 assert bs == point_embeddings.shape[1], (
-                    f"Batch size mismatch between box and point embeddings. Got {bs} and {point_embeddings.shape[1]}."
+                    f'Batch size mismatch between box and point embeddings. Got {bs} and {point_embeddings.shape[1]}.'
                 )
             else:
                 bs = point_embeddings.shape[1]
             if device is not None:
-                assert device == point_embeddings.device, (
-                    "Device mismatch between box and point embeddings"
-                )
+                assert device == point_embeddings.device, 'Device mismatch between box and point embeddings'
             else:
                 device = point_embeddings.device
 
@@ -267,14 +236,12 @@ class Prompt:
             mask_seq_len = mask_embeddings.shape[0]
             if bs is not None:
                 assert bs == mask_embeddings.shape[1], (
-                    f"Batch size mismatch between box/point and mask embedding. Got {bs} and {mask_embeddings.shape[1]}"
+                    f'Batch size mismatch between box/point and mask embedding. Got {bs} and {mask_embeddings.shape[1]}'
                 )
             else:
                 bs = mask_embeddings.shape[1]
             if device is not None:
-                assert device == mask_embeddings.device, (
-                    "Device mismatch between box/point and mask embeddings."
-                )
+                assert device == mask_embeddings.device, 'Device mismatch between box/point and mask embeddings.'
             else:
                 device = mask_embeddings.device
 
@@ -289,25 +256,19 @@ class Prompt:
             box_mask = torch.zeros(bs, box_seq_len, device=device, dtype=torch.bool)
         return box_embeddings, box_labels, box_mask
 
-    def _init_point(
-        self, point_embeddings, point_labels, point_mask, point_seq_len, bs, device
-    ):
+    def _init_point(self, point_embeddings, point_labels, point_mask, point_seq_len, bs, device):
         """
         Identical to _init_box. Except that C=2 for points (vs. 4 for boxes).
         """
         if point_embeddings is None:
             point_embeddings = torch.zeros(point_seq_len, bs, 2, device=device)
         if point_labels is None:
-            point_labels = torch.ones(
-                point_seq_len, bs, device=device, dtype=torch.long
-            )
+            point_labels = torch.ones(point_seq_len, bs, device=device, dtype=torch.long)
         if point_mask is None:
             point_mask = torch.zeros(bs, point_seq_len, device=device, dtype=torch.bool)
         return point_embeddings, point_labels, point_mask
 
-    def _init_mask(
-        self, mask_embeddings, mask_labels, mask_mask, mask_seq_len, bs, device
-    ):
+    def _init_mask(self, mask_embeddings, mask_labels, mask_mask, mask_seq_len, bs, device):
         # NOTE: Mask embeddings can be of arbitrary resolution, so we don't initialize it here.
         # In case we append new mask, we check that its resolution matches exisiting ones (if any).
         # In case mask_embeddings is None, we should never encode it.
@@ -328,17 +289,13 @@ class Prompt:
         assert boxes.shape[1] == labels.shape[1] == bs
         assert list(boxes.shape[:2]) == list(labels.shape[:2])
         if mask is None:
-            mask = torch.zeros(
-                bs, boxes.shape[0], dtype=torch.bool, device=boxes.device
-            )
+            mask = torch.zeros(bs, boxes.shape[0], dtype=torch.bool, device=boxes.device)
 
         self.box_labels, _ = concat_padded_sequences(
             self.box_labels.unsqueeze(-1), self.box_mask, labels.unsqueeze(-1), mask
         )
         self.box_labels = self.box_labels.squeeze(-1)
-        self.box_embeddings, self.box_mask = concat_padded_sequences(
-            self.box_embeddings, self.box_mask, boxes, mask
-        )
+        self.box_embeddings, self.box_mask = concat_padded_sequences(self.box_embeddings, self.box_mask, boxes, mask)
 
     def append_points(self, points, labels, mask=None):
         if self.point_embeddings is None:
@@ -351,9 +308,7 @@ class Prompt:
         assert points.shape[1] == labels.shape[1] == bs
         assert list(points.shape[:2]) == list(labels.shape[:2])
         if mask is None:
-            mask = torch.zeros(
-                bs, points.shape[0], dtype=torch.bool, device=points.device
-            )
+            mask = torch.zeros(bs, points.shape[0], dtype=torch.bool, device=points.device)
 
         self.point_labels, _ = concat_padded_sequences(
             self.point_labels.unsqueeze(-1), self.point_mask, labels.unsqueeze(-1), mask
@@ -370,34 +325,24 @@ class Prompt:
             self.mask_embeddings = masks
             mask_seq_len, bs = masks.shape[:2]
             if labels is None:
-                self.mask_labels = torch.ones(
-                    mask_seq_len, bs, device=masks.device, dtype=torch.long
-                )
+                self.mask_labels = torch.ones(mask_seq_len, bs, device=masks.device, dtype=torch.long)
             else:
                 self.mask_labels = labels
             if attn_mask is None:
-                self.mask_mask = torch.zeros(
-                    bs, mask_seq_len, device=masks.device, dtype=torch.bool
-                )
+                self.mask_mask = torch.zeros(bs, mask_seq_len, device=masks.device, dtype=torch.bool)
             else:
                 self.mask_mask = attn_mask
         else:
-            raise NotImplementedError("Only one mask per prompt is supported.")
+            raise NotImplementedError('Only one mask per prompt is supported.')
 
     def clone(self):
         return Prompt(
-            box_embeddings=(
-                None if self.box_embeddings is None else self.box_embeddings.clone()
-            ),
+            box_embeddings=(None if self.box_embeddings is None else self.box_embeddings.clone()),
             box_mask=None if self.box_mask is None else self.box_mask.clone(),
-            point_embeddings=(
-                None if self.point_embeddings is None else self.point_embeddings.clone()
-            ),
+            point_embeddings=(None if self.point_embeddings is None else self.point_embeddings.clone()),
             point_mask=None if self.point_mask is None else self.point_mask.clone(),
             box_labels=None if self.box_labels is None else self.box_labels.clone(),
-            point_labels=(
-                None if self.point_labels is None else self.point_labels.clone()
-            ),
+            point_labels=(None if self.point_labels is None else self.point_labels.clone()),
         )
 
 
@@ -528,15 +473,10 @@ class SequenceGeometryEncoder(nn.Module):
         if add_cls:
             self.cls_embed = torch.nn.Embedding(1, self.d_model)
 
-        assert points_direct_project or points_pos_enc or points_pool, (
-            "Error: need at least one way to encode points"
+        assert points_direct_project or points_pos_enc or points_pool, 'Error: need at least one way to encode points'
+        assert encode_boxes_as_points or boxes_direct_project or boxes_pos_enc or boxes_pool, (
+            'Error: need at least one way to encode boxes'
         )
-        assert (
-            encode_boxes_as_points
-            or boxes_direct_project
-            or boxes_pos_enc
-            or boxes_pool
-        ), "Error: need at least one way to encode boxes"
 
         self.points_direct_project = None
         if points_direct_project:
@@ -555,9 +495,7 @@ class SequenceGeometryEncoder(nn.Module):
             if boxes_direct_project:
                 self.boxes_direct_project = nn.Linear(4, self.d_model)
             if boxes_pool:
-                self.boxes_pool_project = nn.Conv2d(
-                    self.d_model, self.d_model, self.roi_size
-                )
+                self.boxes_pool_project = nn.Conv2d(self.d_model, self.d_model, self.roi_size)
             if boxes_pos_enc:
                 self.boxes_pos_enc_project = nn.Linear(self.d_model + 2, self.d_model)
 
@@ -573,15 +511,13 @@ class SequenceGeometryEncoder(nn.Module):
 
         self.encode = None
         if num_layers > 0:
-            assert add_cls, (
-                "It's currently highly recommended to add a CLS when using a transformer"
-            )
+            assert add_cls, "It's currently highly recommended to add a CLS when using a transformer"
             self.encode = get_clones(layer, num_layers)
             self.encode_norm = nn.LayerNorm(self.d_model)
 
         if mask_encoder is not None:
             assert isinstance(mask_encoder, MaskEncoder), (
-                f"Expected mask_encoder of type MaskEncoder. Got {type(mask_encoder)}."
+                f'Expected mask_encoder of type MaskEncoder. Got {type(mask_encoder)}.'
             )
             if add_mask_label:
                 self.mask_label_embed = torch.nn.Embedding(2, self.d_model)
@@ -605,9 +541,7 @@ class SequenceGeometryEncoder(nn.Module):
             grid = points.transpose(0, 1).unsqueeze(2)
             # re normalize to [-1, 1]
             grid = (grid * 2) - 1
-            sampled = torch.nn.functional.grid_sample(
-                img_feats, grid, align_corners=False
-            )
+            sampled = torch.nn.functional.grid_sample(img_feats, grid, align_corners=False)
             assert list(sampled.shape) == [bs, self.d_model, n_points, 1]
             sampled = sampled.squeeze(-1).permute(2, 0, 1)
             proj = self.points_pool_project(sampled)
@@ -651,9 +585,7 @@ class SequenceGeometryEncoder(nn.Module):
             scale = scale.pin_memory().to(device=boxes_xyxy.device, non_blocking=True)
             scale = scale.view(1, 1, 4)
             boxes_xyxy = boxes_xyxy * scale
-            sampled = torchvision.ops.roi_align(
-                img_feats, boxes_xyxy.float().transpose(0, 1).unbind(0), self.roi_size
-            )
+            sampled = torchvision.ops.roi_align(img_feats, boxes_xyxy.float().transpose(0, 1).unbind(0), self.roi_size)
             assert list(sampled.shape) == [
                 bs * n_boxes,
                 self.d_model,
@@ -669,9 +601,7 @@ class SequenceGeometryEncoder(nn.Module):
 
         if self.boxes_pos_enc_project is not None:
             cx, cy, w, h = boxes.unbind(-1)
-            enc = self.pos_enc.encode_boxes(
-                cx.flatten(), cy.flatten(), w.flatten(), h.flatten()
-            )
+            enc = self.pos_enc.encode_boxes(cx.flatten(), cy.flatten(), w.flatten(), h.flatten())
             enc = enc.view(boxes.shape[0], boxes.shape[1], enc.shape[-1])
 
             proj = self.boxes_pos_enc_project(enc)
@@ -693,14 +623,12 @@ class SequenceGeometryEncoder(nn.Module):
     ):
         n_masks, bs = masks.shape[:2]
         assert n_masks == 1, (
-            "We assume one mask per prompt for now. Code should still be functional if this assertion is removed."
+            'We assume one mask per prompt for now. Code should still be functional if this assertion is removed.'
         )
         assert list(attn_mask.shape) == [
             bs,
             n_masks,
-        ], (
-            f"Expected attn_mask to be of shape {bs}x{n_masks}. Got {list(attn_mask.shape)}."
-        )
+        ], f'Expected attn_mask to be of shape {bs}x{n_masks}. Got {list(attn_mask.shape)}.'
         masks, pos = self.mask_encoder(
             masks=masks.flatten(0, 1).float(),
             pix_feat=img_feats,
@@ -709,9 +637,7 @@ class SequenceGeometryEncoder(nn.Module):
         n_tokens_per_mask = H * W
         # NOTE: We directly add pos enc here as we usually don't keep track of pos encoding for the concatenated prompt (text, other geometric prompts). Might need to do some refactoring for more flexibility.
         masks = masks + pos
-        masks = masks.view(n_masks, bs, *masks.shape[1:]).flatten(
-            -2
-        )  # n_masks x bs x C x H*W
+        masks = masks.view(n_masks, bs, *masks.shape[1:]).flatten(-2)  # n_masks x bs x C x H*W
         masks = masks.permute(0, 3, 1, 2).flatten(0, 1)  # n_masks * H*W x bs x C
         attn_mask = attn_mask.repeat_interleave(n_tokens_per_mask, dim=1)
         if self.add_mask_label:
@@ -730,9 +656,7 @@ class SequenceGeometryEncoder(nn.Module):
         masks_labels = geo_prompt.mask_labels
         seq_first_img_feats = img_feats[-1]  # [H*W, B, C]
         seq_first_img_pos_embeds = (
-            img_pos_embeds[-1]
-            if img_pos_embeds is not None
-            else torch.zeros_like(seq_first_img_feats)
+            img_pos_embeds[-1] if img_pos_embeds is not None else torch.zeros_like(seq_first_img_feats)
         )
 
         # pyrefly: ignore [not-callable]
@@ -762,9 +686,7 @@ class SequenceGeometryEncoder(nn.Module):
 
             # Append to the existing points
             # pyrefly: ignore [bad-unpacking]
-            points, _ = concat_padded_sequences(
-                points, points_mask, top_left, boxes_mask
-            )
+            points, _ = concat_padded_sequences(points, points_mask, top_left, boxes_mask)
             # pyrefly: ignore [bad-unpacking]
             points_labels, points_mask = concat_padded_sequences(
                 points_labels.unsqueeze(-1),
@@ -775,9 +697,7 @@ class SequenceGeometryEncoder(nn.Module):
             points_labels = points_labels.squeeze(-1)
 
             # pyrefly: ignore [bad-unpacking]
-            points, _ = concat_padded_sequences(
-                points, points_mask, bottom_right, boxes_mask
-            )
+            points, _ = concat_padded_sequences(points, points_mask, bottom_right, boxes_mask)
             # pyrefly: ignore [bad-unpacking]
             points_labels, points_mask = concat_padded_sequences(
                 points_labels.unsqueeze(-1),
@@ -803,9 +723,7 @@ class SequenceGeometryEncoder(nn.Module):
             )
 
             # pyrefly: ignore [bad-unpacking]
-            final_embeds, final_mask = concat_padded_sequences(
-                final_embeds, final_mask, boxes_embeds, boxes_mask
-            )
+            final_embeds, final_mask = concat_padded_sequences(final_embeds, final_mask, boxes_embeds, boxes_mask)
 
         if masks is not None and self.mask_encoder is not None:
             masks_embed, masks_mask = self._encode_masks(
@@ -820,13 +738,9 @@ class SequenceGeometryEncoder(nn.Module):
         assert final_mask.shape[0] == bs
         if self.cls_embed is not None:
             cls = self.cls_embed.weight.view(1, 1, self.d_model).repeat(1, bs, 1)
-            cls_mask = torch.zeros(
-                bs, 1, dtype=final_mask.dtype, device=final_mask.device
-            )
+            cls_mask = torch.zeros(bs, 1, dtype=final_mask.dtype, device=final_mask.device)
             # pyrefly: ignore [bad-unpacking]
-            final_embeds, final_mask = concat_padded_sequences(
-                final_embeds, final_mask, cls, cls_mask
-            )
+            final_embeds, final_mask = concat_padded_sequences(final_embeds, final_mask, cls, cls_mask)
 
         if self.final_proj is not None:
             final_embeds = self.norm(self.final_proj(final_embeds))

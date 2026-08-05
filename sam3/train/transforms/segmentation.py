@@ -24,8 +24,7 @@ class InstanceToSemantic(object):
 
             if self.use_rle:
                 all_segs = [
-                    datapoint.images[fquery.image_id].objects[obj_id].segment
-                    for obj_id in fquery.object_ids_output
+                    datapoint.images[fquery.image_id].objects[obj_id].segment for obj_id in fquery.object_ids_output
                 ]
                 if len(all_segs) > 0:
                     # we need to double check that all rles are the correct size
@@ -33,19 +32,17 @@ class InstanceToSemantic(object):
                     for seg in all_segs:
                         # pyre-fixme[16]: Item `None` of `None | dict[Any, Any] |
                         #  Tensor` has no attribute `__getitem__`.
-                        assert seg["size"] == all_segs[0]["size"], (
-                            "Instance segments have inconsistent sizes. "
+                        assert seg['size'] == all_segs[0]['size'], (
+                            'Instance segments have inconsistent sizes. '
                             # pyre-fixme[16]: Item `None` of `None | dict[Any, Any]
                             #  | Tensor` has no attribute `__getitem__`.
-                            f"Found sizes {seg['size']} and {all_segs[0]['size']}"
+                            f'Found sizes {seg["size"]} and {all_segs[0]["size"]}'
                         )
                     fquery.semantic_target = mask_utils.merge(all_segs)
                 else:
                     # There is no good way to create an empty RLE of the correct size
                     # We resort to converting an empty box to RLE
-                    fquery.semantic_target = mask_utils.frPyObjects(
-                        np.array([[0, 0, 0, 0]], dtype=np.float64), h, w
-                    )[0]
+                    fquery.semantic_target = mask_utils.frPyObjects(np.array([[0, 0, 0, 0]], dtype=np.float64), h, w)[0]
 
             else:
                 # `semantic_target` is uint8 and remains uint8 throughout the transforms
@@ -54,10 +51,7 @@ class InstanceToSemantic(object):
                 for obj_id in fquery.object_ids_output:
                     segment = datapoint.images[fquery.image_id].objects[obj_id].segment
                     if segment is not None:
-                        assert (
-                            isinstance(segment, torch.Tensor)
-                            and segment.dtype == torch.uint8
-                        )
+                        assert isinstance(segment, torch.Tensor) and segment.dtype == torch.uint8
                         # pyre-fixme[16]: Optional type has no attribute `__ior__`.
                         fquery.semantic_target |= segment
 
@@ -103,16 +97,14 @@ class DecodeRle:
             elif isinstance(img.data, torch.Tensor):
                 img_w, img_h = img.data.shape[-2:]
             else:
-                raise RuntimeError(f"Unexpected image type {type(img.data)}")
+                raise RuntimeError(f'Unexpected image type {type(img.data)}')
 
             imgId2size[imgId] = (img_h, img_w)
 
             for obj in img.objects:
-                if obj.segment is not None and not isinstance(
-                    obj.segment, torch.Tensor
-                ):
+                if obj.segment is not None and not isinstance(obj.segment, torch.Tensor):
                     if mask_utils.area(obj.segment) == 0:
-                        print("Warning, empty mask found, approximating from box")
+                        print('Warning, empty mask found, approximating from box')
                         obj.segment = torch.zeros(img_h, img_w, dtype=torch.uint8)
                         x1, y1, x2, y2 = obj.bbox.int().tolist()
                         obj.segment[y1 : max(y2, y1 + 1), x1 : max(x1 + 1, x2)] = 1
@@ -126,7 +118,7 @@ class DecodeRle:
                         # Should not happen often, but adding for security
                         if not warning_shown:
                             print(
-                                f"Warning expected instance segmentation size to be {[img_h, img_w]} but found {list(obj.segment.shape)}"
+                                f'Warning expected instance segmentation size to be {[img_h, img_w]} but found {list(obj.segment.shape)}'
                             )
                             # Printing only once per datapoint to avoid spam
                             warning_shown = True
@@ -144,18 +136,14 @@ class DecodeRle:
 
         warning_shown = False
         for query in datapoint.find_queries:
-            if query.semantic_target is not None and not isinstance(
-                query.semantic_target, torch.Tensor
-            ):
+            if query.semantic_target is not None and not isinstance(query.semantic_target, torch.Tensor):
                 query.semantic_target = mask_utils.decode(query.semantic_target)
                 # segment is uint8 and remains uint8 throughout the transforms
-                query.semantic_target = torch.tensor(query.semantic_target).to(
-                    torch.uint8
-                )
+                query.semantic_target = torch.tensor(query.semantic_target).to(torch.uint8)
                 if tuple(query.semantic_target.shape) != imgId2size[query.image_id]:
                     if not warning_shown:
                         print(
-                            f"Warning expected semantic segmentation size to be {imgId2size[query.image_id]} but found {tuple(query.semantic_target.shape)}"
+                            f'Warning expected semantic segmentation size to be {imgId2size[query.image_id]} but found {tuple(query.semantic_target.shape)}'
                         )
                         # Printing only once per datapoint to avoid spam
                         warning_shown = True

@@ -18,32 +18,32 @@ import json
 import os
 
 VAL13_SET = [
-    "AerialMaritimeDrone_large",
-    "Aquarium",
-    "CottontailRabbits",
-    "EgoHands_generic",
-    "NorthAmericaMushrooms",
-    "Packages",
-    "PascalVOC",
-    "Raccoon",
-    "ShellfishOpenImages",
-    "VehiclesOpenImages",
-    "pistols",
-    "pothole",
-    "thermalDogsAndPeople",
+    'AerialMaritimeDrone_large',
+    'Aquarium',
+    'CottontailRabbits',
+    'EgoHands_generic',
+    'NorthAmericaMushrooms',
+    'Packages',
+    'PascalVOC',
+    'Raccoon',
+    'ShellfishOpenImages',
+    'VehiclesOpenImages',
+    'pistols',
+    'pothole',
+    'thermalDogsAndPeople',
 ]
 
-METRIC_NAME = "coco_eval_bbox_AP"
+METRIC_NAME = 'coco_eval_bbox_AP'
 
 
 def parse_args():
-    parser = argparse.ArgumentParser("ODinW results aggregation script")
+    parser = argparse.ArgumentParser('ODinW results aggregation script')
 
     parser.add_argument(
-        "--res_dir",
+        '--res_dir',
         required=True,
         type=str,
-        help="Parent directory containing subdirectories for each dataset with val_stats.json files",
+        help='Parent directory containing subdirectories for each dataset with val_stats.json files',
     )
 
     return parser.parse_args()
@@ -57,10 +57,10 @@ def main(args):
     # Process each subset directory
     for subset in VAL13_SET:
         subset_dir = os.path.join(args.res_dir, subset)
-        val_stats_path = os.path.join(subset_dir, "val_stats.json")
+        val_stats_path = os.path.join(subset_dir, 'val_stats.json')
 
         if not os.path.exists(val_stats_path):
-            print(f"Warning: {val_stats_path} not found, skipping {subset}")
+            print(f'Warning: {val_stats_path} not found, skipping {subset}')
             continue
 
         try:
@@ -73,25 +73,25 @@ def main(args):
                     metric_results[METRIC_NAME].append(value)
 
         except (json.JSONDecodeError, IOError) as e:
-            print(f"Error reading {val_stats_path}: {e}")
+            print(f'Error reading {val_stats_path}: {e}')
             continue
 
     # Print results
     values = metric_results[METRIC_NAME]
     if values:
         avg = sum(values) / len(values)
-        print(f"Average {METRIC_NAME}: {avg:.4f} ({len(values)} datasets)")
+        print(f'Average {METRIC_NAME}: {avg:.4f} ({len(values)} datasets)')
 
         # Show individual dataset results
         for subset in VAL13_SET:
             if subset in subset_results and subset_results[subset]:
                 for res_key, res_value in subset_results[subset].items():
                     if res_key.endswith(METRIC_NAME):
-                        print(f"  {subset}: {res_value:.4f}")
+                        print(f'  {subset}: {res_value:.4f}')
                         break
     else:
-        print(f"No results found for {METRIC_NAME}")
+        print(f'No results found for {METRIC_NAME}')
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main(parse_args())

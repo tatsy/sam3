@@ -28,58 +28,56 @@ def download_and_extract_frames(saco_yt1b_id, args):
     )
 
     status = video_prep.download_youtube_video()
-    logger.info(f"[video download][{saco_yt1b_id}] download status {status}")
+    logger.info(f'[video download][{saco_yt1b_id}] download status {status}')
 
-    if status not in ["already exists", "success"]:
-        logger.warning(
-            f"Video download failed for {saco_yt1b_id}, skipping frame generation"
-        )
+    if status not in ['already exists', 'success']:
+        logger.warning(f'Video download failed for {saco_yt1b_id}, skipping frame generation')
         return False
 
     status = video_prep.extract_frames_in_6fps_and_width_1080()
-    logger.info(f"[frame extracting][{saco_yt1b_id}] frame extracting status {status}")
+    logger.info(f'[frame extracting][{saco_yt1b_id}] frame extracting status {status}')
     return True
 
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--data_dir",
+        '--data_dir',
         type=str,
         required=True,
     )
     parser.add_argument(
-        "--cookies_file",
+        '--cookies_file',
         type=str,
         required=True,
     )
     parser.add_argument(
-        "--yt1b_start_end_time_file",
+        '--yt1b_start_end_time_file',
         type=str,
         required=True,
     )
     parser.add_argument(
-        "--yt1b_frame_prep_log_file",
+        '--yt1b_frame_prep_log_file',
         type=str,
         required=True,
     )
     parser.add_argument(
-        "--ffmpeg_timeout",
+        '--ffmpeg_timeout',
         type=str,
         default=7200,  # Use longer timeout in case of large videos processing timeout
     )
     parser.add_argument(
-        "--sleep_interval",
+        '--sleep_interval',
         type=int,
         default=10,
     )
     parser.add_argument(
-        "--max_sleep_interval",
+        '--max_sleep_interval',
         type=int,
         default=30,
     )
     parser.add_argument(
-        "--num_workers",
+        '--num_workers',
         type=int,
         default=4,
     )
@@ -93,9 +91,9 @@ def main():
     # Configure the ROOT logger so all child loggers inherit the configuration
     logging.basicConfig(
         level=logging.INFO,
-        format="%(asctime)s [%(processName)s/%(threadName)s] %(name)s - %(levelname)s: %(message)s",
+        format='%(asctime)s [%(processName)s/%(threadName)s] %(name)s - %(levelname)s: %(message)s',
         handlers=[
-            logging.FileHandler(args.yt1b_frame_prep_log_file, mode="w"),
+            logging.FileHandler(args.yt1b_frame_prep_log_file, mode='w'),
             logging.StreamHandler(),
         ],
         force=True,  # Override any existing configuration
@@ -112,13 +110,13 @@ def main():
 
     args = parser.parse_args()
 
-    with open(args.yt1b_start_end_time_file, "r") as f:
+    with open(args.yt1b_start_end_time_file, 'r') as f:
         yt1b_start_end_time_df = pd.read_json(f)
 
     saco_yt1b_ids = yt1b_start_end_time_df.saco_yt1b_id.unique()
     num_workers = args.num_workers
     logger.info(
-        f"Starting with {num_workers} parallel worker(s) (sleep_interval={args.sleep_interval}-{args.max_sleep_interval}s)"
+        f'Starting with {num_workers} parallel worker(s) (sleep_interval={args.sleep_interval}-{args.max_sleep_interval}s)'
     )
 
     with mp.Pool(num_workers) as p:
@@ -135,5 +133,5 @@ def main():
     logger.info(done_str)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()

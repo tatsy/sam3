@@ -48,7 +48,7 @@ class Sam3MultiplexVideoPredictor(Sam3BasePredictor):
         torch.backends.cuda.matmul.allow_tf32 = True
         torch.backends.cudnn.allow_tf32 = True
         # use bfloat16 inference for Flash Attention kernel
-        self.bf16_context = torch.autocast(device_type="cuda", dtype=torch.bfloat16)
+        self.bf16_context = torch.autocast(device_type='cuda', dtype=torch.bfloat16)
         self.bf16_context.__enter__()
 
         if warm_up:
@@ -60,4 +60,4 @@ class Sam3MultiplexVideoPredictor(Sam3BasePredictor):
         """Update last-use time and store session expiration timeout."""
         super()._extend_expiration_time(session)
         if self.session_expiration_sec:
-            session["expiration_sec"] = self.session_expiration_sec
+            session['expiration_sec'] = self.session_expiration_sec

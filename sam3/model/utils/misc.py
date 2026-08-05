@@ -10,7 +10,7 @@ import torch
 
 
 def _is_named_tuple(x) -> bool:
-    return isinstance(x, tuple) and hasattr(x, "_asdict") and hasattr(x, "_fields")
+    return isinstance(x, tuple) and hasattr(x, '_asdict') and hasattr(x, '_fields')
 
 
 @runtime_checkable
@@ -34,34 +34,24 @@ def copy_data_to_device(data, device: torch.device, *args: Any, **kwargs: Any):
     """
 
     if _is_named_tuple(data):
-        return type(data)(
-            **copy_data_to_device(data._asdict(), device, *args, **kwargs)
-        )
+        return type(data)(**copy_data_to_device(data._asdict(), device, *args, **kwargs))
     elif isinstance(data, (list, tuple)):
         return type(data)(copy_data_to_device(e, device, *args, **kwargs) for e in data)
     elif isinstance(data, defaultdict):
         return type(data)(
             data.default_factory,
-            {
-                k: copy_data_to_device(v, device, *args, **kwargs)
-                for k, v in data.items()
-            },
+            {k: copy_data_to_device(v, device, *args, **kwargs) for k, v in data.items()},
         )
     elif isinstance(data, Mapping):
         # pyrefly: ignore [bad-instantiation]
         return type(data)(
             # pyrefly: ignore [bad-argument-count]
-            {
-                k: copy_data_to_device(v, device, *args, **kwargs)
-                for k, v in data.items()
-            }
+            {k: copy_data_to_device(v, device, *args, **kwargs) for k, v in data.items()}
         )
     elif is_dataclass(data) and not isinstance(data, type):
         new_data_class = type(data)(
             **{
-                field.name: copy_data_to_device(
-                    getattr(data, field.name), device, *args, **kwargs
-                )
+                field.name: copy_data_to_device(getattr(data, field.name), device, *args, **kwargs)
                 for field in fields(data)
                 if field.init
             }
@@ -71,9 +61,7 @@ def copy_data_to_device(data, device: torch.device, *args: Any, **kwargs: Any):
                 setattr(
                     new_data_class,
                     field.name,
-                    copy_data_to_device(
-                        getattr(data, field.name), device, *args, **kwargs
-                    ),
+                    copy_data_to_device(getattr(data, field.name), device, *args, **kwargs),
                 )
         return new_data_class
     elif isinstance(data, _CopyableData):

@@ -24,12 +24,10 @@ from .mask_sampling import (
 )
 
 
-CORE_LOSS_KEY = "core_loss"
+CORE_LOSS_KEY = 'core_loss'
 
 
-def instance_masks_to_semantic_masks(
-    instance_masks: torch.Tensor, num_instances: torch.Tensor
-) -> torch.Tensor:
+def instance_masks_to_semantic_masks(instance_masks: torch.Tensor, num_instances: torch.Tensor) -> torch.Tensor:
     """This function converts instance masks to semantic masks.
     It accepts a collapsed batch of instances masks (ie all instance masks are concatenated in a single tensor) and
     the number of instances in each image of the batch.
@@ -88,7 +86,7 @@ def dice_loss(inputs, targets, num_boxes, loss_on_multimask=False, reduce=True):
     try:
         loss = _dice_loss(inputs, targets, num_boxes, loss_on_multimask, reduce)
     except torch.OutOfMemoryError:
-        logging.error("GPU OOM, computing dice loss on CPU")
+        logging.error('GPU OOM, computing dice loss on CPU')
         # try to recover from GPU OOM by moving tensors to CPU and computing loss there
         orig_device = inputs.device
         inputs = inputs.cpu()
@@ -148,7 +146,7 @@ def sigmoid_focal_loss(
         Loss tensor
     """
     if not (0 <= alpha <= 1) and triton:
-        raise RuntimeError(f"Alpha should be in [0,1], got {alpha}")
+        raise RuntimeError(f'Alpha should be in [0,1], got {alpha}')
     if triton:
         if reduce and not loss_on_multimask:
             loss = triton_sigmoid_focal_loss_reduce(inputs, targets, alpha, gamma)
@@ -157,7 +155,7 @@ def sigmoid_focal_loss(
         loss = triton_sigmoid_focal_loss(inputs, targets, alpha, gamma)
     else:
         prob = inputs.sigmoid()
-        ce_loss = F.binary_cross_entropy_with_logits(inputs, targets, reduction="none")
+        ce_loss = F.binary_cross_entropy_with_logits(inputs, targets, reduction='none')
         p_t = prob * targets + (1 - prob) * (1 - targets)
         loss = ce_loss * ((1 - p_t) ** gamma)
 
@@ -175,9 +173,7 @@ def sigmoid_focal_loss(
     return loss.mean(1).sum() / num_boxes
 
 
-def iou_loss(
-    inputs, targets, pred_ious, num_boxes, loss_on_multimask=False, use_l1_loss=False
-):
+def iou_loss(inputs, targets, pred_ious, num_boxes, loss_on_multimask=False, use_l1_loss=False):
     """MSE loss between predicted IoUs and actual IoUs between inputs and targets."""
     assert inputs.dim() == 4 and targets.dim() == 4
     pred_mask = inputs.flatten(2) > 0
@@ -187,9 +183,9 @@ def iou_loss(
     actual_ious = area_i / torch.clamp(area_u, min=1.0)
 
     if use_l1_loss:
-        loss = F.l1_loss(pred_ious, actual_ious, reduction="none")
+        loss = F.l1_loss(pred_ious, actual_ious, reduction='none')
     else:
-        loss = F.mse_loss(pred_ious, actual_ious, reduction="none")
+        loss = F.mse_loss(pred_ious, actual_ious, reduction='none')
     if loss_on_multimask:
         return loss / num_boxes
     return loss.sum() / num_boxes
@@ -206,9 +202,7 @@ def _contrastive_align(logits, positive_map):
 
     nb_pos = positive_map.sum(2) + 1e-6
 
-    box_to_token_loss = (
-        (pos_term / nb_pos + neg_term).masked_fill(~boxes_with_pos, 0).sum()
-    )
+    box_to_token_loss = (pos_term / nb_pos + neg_term).masked_fill(~boxes_with_pos, 0).sum()
 
     tokens_with_pos = positive_map.any(1)
     pos_term = positive_logits.sum(1)
@@ -216,17 +210,13 @@ def _contrastive_align(logits, positive_map):
 
     nb_pos = positive_map.sum(1) + 1e-6
 
-    tokens_to_boxes_loss = (
-        (pos_term / nb_pos + neg_term).masked_fill(~tokens_with_pos, 0).sum()
-    )
+    tokens_to_boxes_loss = (pos_term / nb_pos + neg_term).masked_fill(~tokens_with_pos, 0).sum()
     return (box_to_token_loss + tokens_to_boxes_loss) / 2
 
 
 def _get_src_permutation_idx(indices):
     # permute predictions following indices
-    batch_idx = torch.cat(
-        [torch.full_like(src, i) for i, (src, _) in enumerate(indices)]
-    )
+    batch_idx = torch.cat([torch.full_like(src, i) for i, (src, _) in enumerate(indices)])
     src_idx = torch.cat([src for (src, _) in indices])
     return batch_idx, src_idx
 
@@ -295,10 +285,10 @@ class IABCEMdetr(LossWithWeights):
         self.gamma = gamma
         self.weak_loss = weak_loss
         self.alpha = alpha
-        self.target_keys.append("boxes_xyxy")
+        self.target_keys.append('boxes_xyxy')
         self.no_loss_for_fp_propagation = no_loss_for_fp_propagation
         if self.weak_loss:
-            self.target_keys.append("is_exhaustive")
+            self.target_keys.append('is_exhaustive')
         # NOTE: This is hacky solution to have the same CE loss scale across datasets where the model might predict different number of object queries for different tasks.
         # If not None, we assume there are a total pad_n_queries object queries.
         # For example, if the model predicts only 1 object query and pad_n_queries=100, we pad the predictions with 99 zero preds.
@@ -317,15 +307,13 @@ class IABCEMdetr(LossWithWeights):
         self.pos_focal = pos_focal
 
         # Decoupled loss for detection and tracking queries
-        self.apply_loss_to_det_queries_in_video_grounding = (
-            apply_loss_to_det_queries_in_video_grounding
-        )
+        self.apply_loss_to_det_queries_in_video_grounding = apply_loss_to_det_queries_in_video_grounding
         self.use_separate_loss_for_det_and_trk = use_separate_loss_for_det_and_trk
         if num_det_queries is not None:
             logging.warning("note: it's not needed to set num_det_queries anymore")
         if self.use_separate_loss_for_det_and_trk:
             assert not self.weak_loss, (
-                "Do not use weak_loss in this case -- set separate loss for detection and tracking queries instead"
+                'Do not use weak_loss in this case -- set separate loss for detection and tracking queries instead'
             )
             self.det_exhaustive_loss_scale_pos = det_exhaustive_loss_scale_pos
             self.det_exhaustive_loss_scale_neg = det_exhaustive_loss_scale_neg
@@ -342,14 +330,14 @@ class IABCEMdetr(LossWithWeights):
                 and trk_loss_scale_pos == 1.0
                 and trk_loss_scale_neg == 1.0
             ), (
-                "If not using separate loss for detection and tracking queries, separate detection and tracking loss scales should all be 1.0"
+                'If not using separate loss for detection and tracking queries, separate detection and tracking loss scales should all be 1.0'
             )
 
     # pyrefly: ignore [bad-override]
     def get_loss(self, outputs, targets, indices, num_boxes):
-        assert len(outputs["pred_logits"].shape) > 2, "Incorrect predicted logits shape"
-        assert outputs["pred_logits"].shape[-1] == 1, "Incorrect predicted logits shape"
-        src_logits = outputs["pred_logits"].squeeze(-1)
+        assert len(outputs['pred_logits'].shape) > 2, 'Incorrect predicted logits shape'
+        assert outputs['pred_logits'].shape[-1] == 1, 'Incorrect predicted logits shape'
+        src_logits = outputs['pred_logits'].squeeze(-1)
         prob = src_logits.sigmoid()
 
         with torch.no_grad():
@@ -360,12 +348,8 @@ class IABCEMdetr(LossWithWeights):
                 device=src_logits.device,
             )
             target_classes[(indices[0], indices[1])] = 1
-            src_boxes_xyxy = outputs["pred_boxes_xyxy"][(indices[0], indices[1])]
-            target_boxes_giou = (
-                targets["boxes_xyxy"][indices[2]]
-                if indices[2] is not None
-                else targets["boxes_xyxy"]
-            )
+            src_boxes_xyxy = outputs['pred_boxes_xyxy'][(indices[0], indices[1])]
+            target_boxes_giou = targets['boxes_xyxy'][indices[2]] if indices[2] is not None else targets['boxes_xyxy']
 
             iou = box_ops.fast_diag_box_iou(src_boxes_xyxy, target_boxes_giou)
             t = prob[(indices[0], indices[1])] ** self.alpha * iou ** (1 - self.alpha)
@@ -384,9 +368,7 @@ class IABCEMdetr(LossWithWeights):
                 reduce=False,
             )
         else:
-            loss_bce = F.binary_cross_entropy_with_logits(
-                src_logits, positive_target_classes, reduction="none"
-            )
+            loss_bce = F.binary_cross_entropy_with_logits(src_logits, positive_target_classes, reduction='none')
         loss_bce = loss_bce * target_classes * self.pos_weight
 
         if (
@@ -396,14 +378,14 @@ class IABCEMdetr(LossWithWeights):
         ):
             loss_bce = loss_bce * self.pad_scale_pos
         # Negatives
-        loss_bce = loss_bce + F.binary_cross_entropy_with_logits(
-            src_logits, target_classes, reduction="none"
-        ) * (1 - target_classes) * (prob**self.gamma)
+        loss_bce = loss_bce + F.binary_cross_entropy_with_logits(src_logits, target_classes, reduction='none') * (
+            1 - target_classes
+        ) * (prob**self.gamma)
 
         # Optionally, not applying IABCEMdetr loss to detection queries in video.
-        is_video_grounding = outputs.get("is_video_grounding_batch", False)
+        is_video_grounding = outputs.get('is_video_grounding_batch', False)
         if is_video_grounding and not self.apply_loss_to_det_queries_in_video_grounding:
-            Q_det = outputs["Q_det"]
+            Q_det = outputs['Q_det']
             loss_bce[:, :Q_det] *= 0.0
         presence_loss = torch.tensor(0.0, device=src_logits.device)
         presence_dec_acc = torch.tensor(0.0, device=src_logits.device)
@@ -413,8 +395,8 @@ class IABCEMdetr(LossWithWeights):
             # GT box exists as there may be dummy boxes for "invisible objects"
             # in video grounding data
 
-            gt_padded_object_ids = targets["object_ids_padded"]  # (B, H)
-            gt_padded_boxes = targets["boxes_padded"]  # (B, H, 4) shape, CxCyWH
+            gt_padded_object_ids = targets['object_ids_padded']  # (B, H)
+            gt_padded_boxes = targets['boxes_padded']  # (B, H, 4) shape, CxCyWH
             gt_padded_is_visible = (
                 (gt_padded_object_ids >= 0)
                 & (gt_padded_boxes[..., 2] > 0)  # width > 0
@@ -426,9 +408,9 @@ class IABCEMdetr(LossWithWeights):
 
             if self.use_presence_semgseg:
                 # no loss here, has it's own separate loss computation
-                assert "presence_logit_dec" not in outputs
-            elif "presence_logit_dec" in outputs:
-                presence_logits = outputs["presence_logit_dec"].view_as(keep_loss)
+                assert 'presence_logit_dec' not in outputs
+            elif 'presence_logit_dec' in outputs:
+                presence_logits = outputs['presence_logit_dec'].view_as(keep_loss)
                 bs = presence_logits.shape[0]
                 presence_loss = sigmoid_focal_loss(
                     presence_logits,
@@ -446,14 +428,14 @@ class IABCEMdetr(LossWithWeights):
 
         if self.weak_loss:
             assert not self.use_separate_loss_for_det_and_trk, (
-                "Do not use weak_loss in this case -- set separate loss for detection and tracking queries instead"
+                'Do not use weak_loss in this case -- set separate loss for detection and tracking queries instead'
             )
 
             # nullify the negative loss for the non-exhaustive classes
-            assert loss_bce.shape[0] == targets["is_exhaustive"].shape[0]
-            assert targets["is_exhaustive"].ndim == 1
+            assert loss_bce.shape[0] == targets['is_exhaustive'].shape[0]
+            assert targets['is_exhaustive'].ndim == 1
 
-            loss_mask = (~targets["is_exhaustive"]).view(-1, 1).expand_as(loss_bce)
+            loss_mask = (~targets['is_exhaustive']).view(-1, 1).expand_as(loss_bce)
             # restrict the mask to the negative supervision
             loss_mask = loss_mask & (target_classes < 0.5)
             loss_mask = ~loss_mask
@@ -464,24 +446,20 @@ class IABCEMdetr(LossWithWeights):
         else:
             # apply separate loss weights to detection and tracking queries
             if self.use_separate_loss_for_det_and_trk:
-                Q_det = outputs["Q_det"]
+                Q_det = outputs['Q_det']
                 assert loss_bce.size(1) >= Q_det
                 is_positive = target_classes > 0.5
                 is_positive_det = is_positive[:, :Q_det]
                 is_positive_trk = is_positive[:, Q_det:]
-                assert loss_bce.size(0) == targets["is_exhaustive"].size(0)
-                is_exhaustive = targets["is_exhaustive"].unsqueeze(1).bool()
+                assert loss_bce.size(0) == targets['is_exhaustive'].size(0)
+                is_exhaustive = targets['is_exhaustive'].unsqueeze(1).bool()
                 loss_scales = torch.zeros_like(loss_bce)
                 # detection query loss weights
                 loss_scales[:, :Q_det] = (
-                    (is_exhaustive & is_positive_det).float()
-                    * self.det_exhaustive_loss_scale_pos
-                    + (is_exhaustive & ~is_positive_det).float()
-                    * self.det_exhaustive_loss_scale_neg
-                    + (~is_exhaustive & is_positive_det).float()
-                    * self.det_non_exhaustive_loss_scale_pos
-                    + (~is_exhaustive & ~is_positive_det).float()
-                    * self.det_non_exhaustive_loss_scale_neg
+                    (is_exhaustive & is_positive_det).float() * self.det_exhaustive_loss_scale_pos
+                    + (is_exhaustive & ~is_positive_det).float() * self.det_exhaustive_loss_scale_neg
+                    + (~is_exhaustive & is_positive_det).float() * self.det_non_exhaustive_loss_scale_pos
+                    + (~is_exhaustive & ~is_positive_det).float() * self.det_non_exhaustive_loss_scale_neg
                 )
                 # tracking query weights
                 loss_scales[:, Q_det:] = (
@@ -492,7 +470,7 @@ class IABCEMdetr(LossWithWeights):
 
                 # if the id is -2 means it is a fp propagation , we don't apply the loss to them
                 if self.no_loss_for_fp_propagation:
-                    is_original_queries = outputs["pred_old_obj_ids"] != -2
+                    is_original_queries = outputs['pred_old_obj_ids'] != -2
                     loss_scales *= (is_exhaustive | is_original_queries).float()
 
                 loss_bce = loss_bce * loss_scales
@@ -502,21 +480,21 @@ class IABCEMdetr(LossWithWeights):
             else:
                 assert isinstance(self.pad_n_queries, int)
                 assert loss_bce.size(1) < self.pad_n_queries, (
-                    f"The number of predictions is more than the expected total after padding. Got {loss_bce.size(1)} predictions."
+                    f'The number of predictions is more than the expected total after padding. Got {loss_bce.size(1)} predictions.'
                 )
                 loss_bce = loss_bce.sum() / (self.pad_n_queries * loss_bce.size(0))
 
         bce_f1 = torchmetrics.functional.f1_score(
             src_logits.sigmoid().flatten(),
             target=target_classes.flatten().long(),
-            task="binary",
+            task='binary',
         )
 
         losses = {
-            "loss_ce": loss_bce,
-            "ce_f1": bce_f1,
-            "presence_loss": presence_loss,
-            "presence_dec_acc": presence_dec_acc,
+            'loss_ce': loss_bce,
+            'ce_f1': bce_f1,
+            'presence_loss': presence_loss,
+            'presence_dec_acc': presence_dec_acc,
         }
         return losses
 
@@ -529,10 +507,8 @@ class Boxes(LossWithWeights):
         apply_loss_to_det_queries_in_video_grounding=True,
     ):
         super().__init__(weight_dict, compute_aux)
-        self.apply_loss_to_det_queries_in_video_grounding = (
-            apply_loss_to_det_queries_in_video_grounding
-        )
-        self.target_keys.extend(["boxes", "boxes_xyxy"])
+        self.apply_loss_to_det_queries_in_video_grounding = apply_loss_to_det_queries_in_video_grounding
+        self.target_keys.extend(['boxes', 'boxes_xyxy'])
 
     # pyrefly: ignore [bad-override]
     def get_loss(self, outputs, targets, indices, num_boxes):
@@ -541,34 +517,24 @@ class Boxes(LossWithWeights):
         The target boxes are expected in format (center_x, center_y, h, w), normalized by the image size.
         """
         # Optionally, not applying Boxes loss to detection queries in video.
-        is_video_grounding = outputs.get("is_video_grounding_batch", False)
+        is_video_grounding = outputs.get('is_video_grounding_batch', False)
         if is_video_grounding and not self.apply_loss_to_det_queries_in_video_grounding:
-            indices = _keep_only_trk_queries_in_match_inds(
-                indices, Q_det=outputs["Q_det"]
-            )
+            indices = _keep_only_trk_queries_in_match_inds(indices, Q_det=outputs['Q_det'])
 
-        assert "pred_boxes" in outputs
+        assert 'pred_boxes' in outputs
         # idx = self._get_src_permutation_idx(indices)
-        src_boxes = outputs["pred_boxes"][(indices[0], indices[1])]
-        src_boxes_xyxy = outputs["pred_boxes_xyxy"][(indices[0], indices[1])]
-        target_boxes = (
-            targets["boxes"] if indices[2] is None else targets["boxes"][indices[2]]
-        )
-        target_boxes_giou = (
-            targets["boxes_xyxy"]
-            if indices[2] is None
-            else targets["boxes_xyxy"][indices[2]]
-        )
+        src_boxes = outputs['pred_boxes'][(indices[0], indices[1])]
+        src_boxes_xyxy = outputs['pred_boxes_xyxy'][(indices[0], indices[1])]
+        target_boxes = targets['boxes'] if indices[2] is None else targets['boxes'][indices[2]]
+        target_boxes_giou = targets['boxes_xyxy'] if indices[2] is None else targets['boxes_xyxy'][indices[2]]
 
-        loss_bbox = F.l1_loss(src_boxes, target_boxes, reduction="none")
+        loss_bbox = F.l1_loss(src_boxes, target_boxes, reduction='none')
 
         losses = {}
-        losses["loss_bbox"] = loss_bbox.sum() / num_boxes
+        losses['loss_bbox'] = loss_bbox.sum() / num_boxes
 
-        loss_giou = 1 - box_ops.fast_diag_generalized_box_iou(
-            src_boxes_xyxy, target_boxes_giou
-        )
-        losses["loss_giou"] = loss_giou.sum() / num_boxes
+        loss_giou = 1 - box_ops.fast_diag_generalized_box_iou(src_boxes_xyxy, target_boxes_giou)
+        losses['loss_giou'] = loss_giou.sum() / num_boxes
         return losses
 
 
@@ -592,10 +558,8 @@ class Masks(LossWithWeights):
         self.num_sample_points = num_sample_points
         self.oversample_ratio = oversample_ratio
         self.importance_sample_ratio = importance_sample_ratio
-        self.apply_loss_to_det_queries_in_video_grounding = (
-            apply_loss_to_det_queries_in_video_grounding
-        )
-        self.target_keys.extend(["masks", "is_valid_mask"])
+        self.apply_loss_to_det_queries_in_video_grounding = apply_loss_to_det_queries_in_video_grounding
+        self.target_keys.extend(['masks', 'is_valid_mask'])
 
     def _sampled_loss(self, src_masks, target_masks, num_boxes):
         assert len(src_masks.shape) == 3 and len(target_masks.shape) == 3
@@ -625,14 +589,14 @@ class Masks(LossWithWeights):
         ).squeeze(1)
 
         losses = {
-            "loss_mask": sigmoid_focal_loss(
+            'loss_mask': sigmoid_focal_loss(
                 sampled_src_masks,
                 sampled_target_masks,
                 num_boxes,
                 alpha=self.focal_alpha,
                 gamma=self.focal_gamma,
             ),
-            "loss_dice": dice_loss(sampled_src_masks, sampled_target_masks, num_boxes),
+            'loss_dice': dice_loss(sampled_src_masks, sampled_target_masks, num_boxes),
         }
         # Not needed for backward
         del src_masks
@@ -645,33 +609,25 @@ class Masks(LossWithWeights):
         """Compute the losses related to the masks: the focal loss and the dice loss.
         targets dicts must contain the key "masks" containing a tensor of dim [nb_target_boxes, h, w]
         """
-        assert "pred_masks" in outputs
-        assert "is_valid_mask" in targets
+        assert 'pred_masks' in outputs
+        assert 'is_valid_mask' in targets
         # Optionally, not applying Masks loss to detection queries in video.
-        is_video_grounding = outputs.get("is_video_grounding_batch", False)
+        is_video_grounding = outputs.get('is_video_grounding_batch', False)
         if is_video_grounding and not self.apply_loss_to_det_queries_in_video_grounding:
-            indices = _keep_only_trk_queries_in_match_inds(
-                indices, Q_det=outputs["Q_det"]
-            )
+            indices = _keep_only_trk_queries_in_match_inds(indices, Q_det=outputs['Q_det'])
 
-        src_masks = outputs["pred_masks"]
+        src_masks = outputs['pred_masks']
 
         # Dataset doesn't have segmentation masks
-        if targets["masks"] is None:
+        if targets['masks'] is None:
             return {
-                "loss_mask": torch.tensor(0.0, device=src_masks.device),
-                "loss_dice": torch.tensor(0.0, device=src_masks.device),
+                'loss_mask': torch.tensor(0.0, device=src_masks.device),
+                'loss_dice': torch.tensor(0.0, device=src_masks.device),
             }
 
-        target_masks = (
-            targets["masks"] if indices[2] is None else targets["masks"][indices[2]]
-        )
+        target_masks = targets['masks'] if indices[2] is None else targets['masks'][indices[2]]
         target_masks = target_masks.to(src_masks)
-        keep = (
-            targets["is_valid_mask"]
-            if indices[2] is None
-            else targets["is_valid_mask"][indices[2]]
-        )
+        keep = targets['is_valid_mask'] if indices[2] is None else targets['is_valid_mask'][indices[2]]
 
         src_masks = src_masks[(indices[0], indices[1])]
 
@@ -697,21 +653,21 @@ class Masks(LossWithWeights):
                 src_masks = interpolate(
                     src_masks,
                     size=target_masks.shape[-2:],
-                    mode="bilinear",
+                    mode='bilinear',
                     align_corners=False,
                 )
                 src_masks = src_masks[:, 0].flatten(1)
                 target_masks = target_masks.flatten(1)
 
             losses = {
-                "loss_mask": sigmoid_focal_loss(
+                'loss_mask': sigmoid_focal_loss(
                     src_masks,
                     target_masks,
                     num_boxes,
                     alpha=self.focal_alpha,
                     gamma=self.focal_gamma,
                 ),
-                "loss_dice": dice_loss(src_masks, target_masks, num_boxes),
+                'loss_dice': dice_loss(src_masks, target_masks, num_boxes),
             }
 
         return losses
@@ -993,8 +949,8 @@ class Masks(LossWithWeights):
 
 def segment_miou(source, target):
     """Compute the mean IoU between two sets of masks"""
-    assert source.shape == target.shape, "The two masks must have the same shape"
-    assert source.ndim == 3, "The masks must be 3D"
+    assert source.shape == target.shape, 'The two masks must have the same shape'
+    assert source.ndim == 3, 'The masks must be 3D'
 
     valid_targets = (target.sum(dim=(1, 2)) > 0).sum()
     if valid_targets == 0:
@@ -1030,14 +986,14 @@ class SemanticSegCriterion(LossWithWeights):
 
     # pyrefly: ignore [bad-override]
     def get_loss(self, out_dict, targets):
-        outputs = out_dict["semantic_seg"]
-        presence_logit = out_dict["presence_logit"]
+        outputs = out_dict['semantic_seg']
+        presence_logit = out_dict['presence_logit']
         if (
-            "semantic_masks" in targets
-            and targets["semantic_masks"] is not None
-            and targets["semantic_masks"].size(0) > 0
+            'semantic_masks' in targets
+            and targets['semantic_masks'] is not None
+            and targets['semantic_masks'].size(0) > 0
         ):
-            semantic_targets = targets["semantic_masks"]
+            semantic_targets = targets['semantic_masks']
             with torch.no_grad():
                 if self.downsample:
                     # downsample targets to the size of predictions
@@ -1046,7 +1002,7 @@ class SemanticSegCriterion(LossWithWeights):
                         F.interpolate(
                             semantic_targets.float().unsqueeze(1),
                             size=size,
-                            mode="bilinear",
+                            mode='bilinear',
                             align_corners=False,
                         )
                         .squeeze(1)
@@ -1059,21 +1015,19 @@ class SemanticSegCriterion(LossWithWeights):
                     size = outputs.shape[-2:]
                     segments = (
                         F.interpolate(
-                            targets["masks"].float().unsqueeze(1),
+                            targets['masks'].float().unsqueeze(1),
                             size=size,
-                            mode="bilinear",
+                            mode='bilinear',
                             align_corners=False,
                         )
                         .squeeze(1)
                         .bool()
                     )
                 else:
-                    segments = targets["masks"].bool()
+                    segments = targets['masks'].bool()
 
                 # the annotations are for instance segmentation, so we merge them to get semantic segmentation
-                semantic_targets = instance_masks_to_semantic_masks(
-                    segments, targets["num_boxes"]
-                )
+                semantic_targets = instance_masks_to_semantic_masks(segments, targets['num_boxes'])
 
         if not self.downsample:
             # upsample predictions to the target size
@@ -1081,7 +1035,7 @@ class SemanticSegCriterion(LossWithWeights):
             outputs = F.interpolate(
                 outputs.float(),
                 size=size,
-                mode="bilinear",
+                mode='bilinear',
                 align_corners=False,
             )
 
@@ -1100,7 +1054,7 @@ class SemanticSegCriterion(LossWithWeights):
             loss = F.binary_cross_entropy_with_logits(
                 outputs.squeeze(1),
                 semantic_targets.float(),
-                reduction="none" if self.presence_head else "mean",
+                reduction='none' if self.presence_head else 'mean',
             )
             if self.presence_head:
                 loss = loss.flatten(1).mean(1)
@@ -1123,11 +1077,7 @@ class SemanticSegCriterion(LossWithWeights):
                     presence_logit.flatten(),
                     presence_target.float(),
                 )
-                presence_acc = (
-                    ((presence_logit.flatten().sigmoid() > 0.5) == presence_target)
-                    .float()
-                    .mean()
-                )
+                presence_acc = ((presence_logit.flatten().sigmoid() > 0.5) == presence_target).float().mean()
             else:
                 # Dummy values
                 loss_presence = torch.tensor(0.0, device=loss.device)
@@ -1135,8 +1085,8 @@ class SemanticSegCriterion(LossWithWeights):
                 # should also track presence_acc
                 presence_acc = torch.tensor(0.0, device=loss.device)
 
-            loss_dict["loss_semantic_presence"] = loss_presence
-            loss_dict["presence_acc"] = presence_acc
+            loss_dict['loss_semantic_presence'] = loss_presence
+            loss_dict['presence_acc'] = presence_acc
 
             # reduce the other losses, skipping the negative ones
             bs = loss.shape[0]
@@ -1150,9 +1100,9 @@ class SemanticSegCriterion(LossWithWeights):
 
         loss_dict.update(
             {
-                "loss_semantic_seg": loss,
-                "loss_semantic_dice": loss_dice,
-                "miou_semantic_seg": miou,
+                'loss_semantic_seg': loss,
+                'loss_semantic_dice': loss_dice,
+                'miou_semantic_seg': miou,
             }
         )
 
@@ -1172,11 +1122,11 @@ class Det2TrkAssoc(LossWithWeights):
         self.fp_loss_on_exhaustive_only = fp_loss_on_exhaustive_only
         self.treat_fp_as_new_obj = treat_fp_as_new_obj
         if self.use_fp_loss:
-            self.target_keys.append("is_exhaustive")
+            self.target_keys.append('is_exhaustive')
 
     # pyrefly: ignore [bad-override]
     def get_loss(self, outputs, targets, indices, num_boxes):
-        det2trk_assoc_logits = outputs["det2trk_assoc_logits"]
+        det2trk_assoc_logits = outputs['det2trk_assoc_logits']
         device = det2trk_assoc_logits.device
         B, Q_det, Q_trk_plus_2 = det2trk_assoc_logits.shape
         assert Q_trk_plus_2 >= 2
@@ -1184,7 +1134,7 @@ class Det2TrkAssoc(LossWithWeights):
 
         # We only apply association losses to those detection queries that either match
         # a GT instance or have score > 0 (i.e. those TP, FN and FP detection queries)
-        matched_object_ids = outputs["matched_object_ids"]
+        matched_object_ids = outputs['matched_object_ids']
         assert matched_object_ids.shape == (B, Q_det + Q_trk)
         matched_obj_ids_det = matched_object_ids[:, :Q_det]
         matched_obj_ids_trk = matched_object_ids[:, Q_det:]
@@ -1211,14 +1161,14 @@ class Det2TrkAssoc(LossWithWeights):
         # c) If a detection query is not matched to GT but have score > 0,
         # we assign it a "false_positive" label
         if self.use_fp_loss:
-            det_is_above_thresh = outputs["pred_logits"][:, :Q_det].squeeze(2) > 0
+            det_is_above_thresh = outputs['pred_logits'][:, :Q_det].squeeze(2) > 0
             det_is_fp = ~det_is_matched_to_gt & det_is_above_thresh
             if self.treat_fp_as_new_obj:
                 det2trk_assoc_labels[det_is_fp] = Q_trk
             else:
                 if self.fp_loss_on_exhaustive_only:
                     # only count FP detections on batches that are exhaustively annotated
-                    det_is_fp &= targets["is_exhaustive"].unsqueeze(1).bool()
+                    det_is_fp &= targets['is_exhaustive'].unsqueeze(1).bool()
                 det2trk_assoc_labels[det_is_fp] = Q_trk + 1
 
         # softmax cross-entropy loss for detection-to-tracking association
@@ -1226,36 +1176,36 @@ class Det2TrkAssoc(LossWithWeights):
             input=det2trk_assoc_logits.flatten(0, 1),  # (B * Q_det, Q_trk + 2)
             target=det2trk_assoc_labels.flatten(0, 1),  # (B * Q_det)
             ignore_index=-1,
-            reduction="none",
+            reduction='none',
         ).view(B, Q_det)
         # skip det2trk assocation loss on frames w/o any (non-padding) tracking queries
         frame_has_valid_trk = trk_is_matched_to_gt.any(dim=-1, keepdims=True)  # (B, 1)
         loss_det2trk_assoc = loss_det2trk_assoc * frame_has_valid_trk.float()
 
         loss_det2trk_assoc = loss_det2trk_assoc.sum() / (B * num_boxes)
-        return {"loss_det2trk_assoc": loss_det2trk_assoc}
+        return {'loss_det2trk_assoc': loss_det2trk_assoc}
 
 
 class TrackingByDetectionAssoc(LossWithWeights):
     def __init__(self, weight_dict):
         super().__init__(weight_dict, compute_aux=False, supports_o2m_loss=False)
-        assert "loss_det2trk_assoc" in self.weight_dict
-        assert "loss_trk2det_assoc" in self.weight_dict
+        assert 'loss_det2trk_assoc' in self.weight_dict
+        assert 'loss_trk2det_assoc' in self.weight_dict
 
     # pyrefly: ignore [bad-override]
     def get_loss(self, outputs, targets, indices, num_boxes):
         # Part A: gather object id matching between detection and tracking
-        det2trk_assoc_logits = outputs["det2trk_assoc_logits"]  # (B, Q_det+1, Q_trk+1)
+        det2trk_assoc_logits = outputs['det2trk_assoc_logits']  # (B, Q_det+1, Q_trk+1)
         B, Q_det_plus_1, Q_trk_plus_1 = det2trk_assoc_logits.shape
         assert Q_det_plus_1 >= 1 and Q_trk_plus_1 >= 1
         Q_det = Q_det_plus_1 - 1
         Q_trk = Q_trk_plus_1 - 1
         device = det2trk_assoc_logits.device
 
-        matched_obj_ids_det = outputs["matched_object_ids"]
+        matched_obj_ids_det = outputs['matched_object_ids']
         assert matched_obj_ids_det.shape == (B, Q_det)
         det_is_matched_to_gt = matched_obj_ids_det >= 0
-        matched_obj_ids_trk = outputs["prev_trk_object_ids"]
+        matched_obj_ids_trk = outputs['prev_trk_object_ids']
         assert matched_obj_ids_trk.shape == (B, Q_trk)
         trk_is_matched_to_gt = matched_obj_ids_trk >= 0
         frame_has_valid_trk = trk_is_matched_to_gt.any(dim=-1, keepdims=True)  # (B, 1)
@@ -1284,12 +1234,12 @@ class TrackingByDetectionAssoc(LossWithWeights):
             input=det2trk_assoc_logits[:, :-1].flatten(0, 1),  # (B*Q_det, Q_trk+1)
             target=det2trk_assoc_labels.flatten(0, 1),  # (B*Q_det)
             ignore_index=-1,
-            reduction="none",
+            reduction='none',
         ).view(B, Q_det)
         # skip det2trk assocation loss on frames w/o any (non-padding) tracking queries
         loss_det2trk_assoc = loss_det2trk_assoc * frame_has_valid_trk.float()
         loss_det2trk_assoc = loss_det2trk_assoc.sum() / (B * num_boxes)
-        loss_dict = {"loss_det2trk_assoc": loss_det2trk_assoc}
+        loss_dict = {'loss_det2trk_assoc': loss_det2trk_assoc}
 
         # Part C: tracking-to-detection association loss
         trk2det_assoc_logits = det2trk_assoc_logits.transpose(1, 2)
@@ -1306,12 +1256,12 @@ class TrackingByDetectionAssoc(LossWithWeights):
             input=trk2det_assoc_logits[:, :-1].flatten(0, 1),  # (B*Q_trk, Q_det+1)
             target=trk2det_assoc_labels.flatten(0, 1),  # (B*Q_trk)
             ignore_index=-1,
-            reduction="none",
+            reduction='none',
         ).view(B, Q_trk)
         # skip trk2det association loss on frames w/o any (non-padding) tracking queries
         loss_trk2det_assoc = loss_trk2det_assoc * frame_has_valid_trk.float()
         loss_trk2det_assoc = loss_trk2det_assoc.sum() / (B * num_boxes)
-        loss_dict["loss_trk2det_assoc"] = loss_trk2det_assoc
+        loss_dict['loss_trk2det_assoc'] = loss_trk2det_assoc
 
         return loss_dict
 

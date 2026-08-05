@@ -8,7 +8,7 @@ from functools import wraps
 
 import torch
 
-__all__ = ["retry_if_cuda_oom"]
+__all__ = ['retry_if_cuda_oom']
 
 
 @contextmanager
@@ -20,7 +20,7 @@ def _ignore_torch_cuda_oom():
         yield
     except RuntimeError as e:
         # NOTE: the string may change?
-        if "CUDA out of memory. " in str(e):
+        if 'CUDA out of memory. ' in str(e):
             pass
         else:
             raise
@@ -59,11 +59,11 @@ def retry_if_cuda_oom(func):
 
     def maybe_to_cpu(x):
         try:
-            like_gpu_tensor = x.device.type == "cuda" and hasattr(x, "to")
+            like_gpu_tensor = x.device.type == 'cuda' and hasattr(x, 'to')
         except AttributeError:
             like_gpu_tensor = False
         if like_gpu_tensor:
-            return x.to(device="cpu")
+            return x.to(device='cpu')
         else:
             return x
 
@@ -79,9 +79,7 @@ def retry_if_cuda_oom(func):
 
         # Try on CPU. This slows down the code significantly, therefore print a notice.
         logger = logging.getLogger(__name__)
-        logger.info(
-            "Attempting to copy inputs of {} to CPU due to CUDA OOM".format(str(func))
-        )
+        logger.info('Attempting to copy inputs of {} to CPU due to CUDA OOM'.format(str(func)))
         new_args = (maybe_to_cpu(x) for x in args)
         new_kwargs = {k: maybe_to_cpu(v) for k, v in kwargs.items()}
         return func(*new_args, **new_kwargs)

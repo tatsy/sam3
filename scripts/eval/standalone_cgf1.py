@@ -15,30 +15,30 @@ from sam3.eval.cgf1_eval import CGF1Evaluator
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--pred_file",
+        '--pred_file',
         type=str,
         required=True,
-        help="Path to the prediction file in COCO format.",
+        help='Path to the prediction file in COCO format.',
     )
     parser.add_argument(
-        "--gt_files",
+        '--gt_files',
         type=str,
-        nargs="+",
+        nargs='+',
         required=True,
-        help="Paths to the ground truth files in COCO format.",
+        help='Paths to the ground truth files in COCO format.',
     )
     args = parser.parse_args()
     if len(args.gt_files) == 0:
-        raise ValueError("At least one GT file must be provided.")
+        raise ValueError('At least one GT file must be provided.')
 
-    is_gold = args.gt_files[0].split("_")[-1].startswith("gold_")
+    is_gold = args.gt_files[0].split('_')[-1].startswith('gold_')
     if is_gold and len(args.gt_files) < 3:
         print(
-            "WARNING: based on the name, it seems you are using gold GT files. Typically, there should be 3 GT files for gold subsets (a, b, c)."
+            'WARNING: based on the name, it seems you are using gold GT files. Typically, there should be 3 GT files for gold subsets (a, b, c).'
         )
 
     evaluator = CGF1Evaluator(
-        gt_path=args.gt_files, verbose=True, iou_type="segm"
+        gt_path=args.gt_files, verbose=True, iou_type='segm'
     )  # change to bbox if you want detection performance
 
     results = evaluator.evaluate(args.pred_file)
@@ -46,5 +46,5 @@ def main():
     print(results)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()

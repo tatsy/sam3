@@ -46,7 +46,7 @@ def build_prod_predictor(checkpoint_path: str, do_compile: bool):
         strict_state_dict_loading=False,
         apply_temporal_disambiguation=True,
         async_loading_frames=False,
-        video_loader_type="cv2",
+        video_loader_type='cv2',
         compile=do_compile,
         gpus_to_use=[0],
     )
@@ -75,22 +75,20 @@ def time_scene_frame(
     def _one_frame() -> float:
         torch.cuda.synchronize()
         t0 = time.perf_counter()
-        resp = model_wrapper.handle_request(
-            {"type": "start_session", "resource_path": image_path}
-        )
-        sid = resp["session_id"]
+        resp = model_wrapper.handle_request({'type': 'start_session', 'resource_path': image_path})
+        sid = resp['session_id']
         for label in labels:
             model_wrapper.handle_request(
                 {
-                    "type": "add_prompt",
-                    "session_id": sid,
-                    "frame_index": 0,
-                    "text": label,
+                    'type': 'add_prompt',
+                    'session_id': sid,
+                    'frame_index': 0,
+                    'text': label,
                 }
             )
         torch.cuda.synchronize()
         dt = (time.perf_counter() - t0) * 1000.0
-        model_wrapper.handle_request({"type": "reset_session", "session_id": sid})
+        model_wrapper.handle_request({'type': 'reset_session', 'session_id': sid})
         return dt
 
     for _ in range(warmup_iters):
@@ -113,7 +111,7 @@ def run(
     full_warmup: bool = False,
     native_warmup: bool = False,
 ) -> float:
-    torch.autocast(device_type="cuda", dtype=torch.bfloat16).__enter__()
+    torch.autocast(device_type='cuda', dtype=torch.bfloat16).__enter__()
 
     synthesize_video_data(
         num_objects=num_objects,
@@ -125,8 +123,8 @@ def run(
         n_frames=n_frames,
     )
 
-    mode = "COMPILED" if do_compile else "EAGER"
-    print(f"\n=== Building {mode} predictor from {checkpoint_path} ===")
+    mode = 'COMPILED' if do_compile else 'EAGER'
+    print(f'\n=== Building {mode} predictor from {checkpoint_path} ===')
     model_wrapper = build_prod_predictor(checkpoint_path, do_compile)
 
     # --native-warmup mirrors the production Sam3DenseTrackingModel.warmup path:
@@ -137,89 +135,83 @@ def run(
     # fires on the TIMED single-image iters (all recompiles absorbed in warmup).
     best_fps = 0.0
     if do_compile and native_warmup:
-        print("Native warmup: _compile_model() direct (no propagate)...")
+        print('Native warmup: _compile_model() direct (no propagate)...')
         model_wrapper.model._compile_model()
     else:
-        response = model_wrapper.handle_request(
-            {"type": "start_session", "resource_path": video_dir}
-        )
-        session_id = response["session_id"]
+        response = model_wrapper.handle_request({'type': 'start_session', 'resource_path': video_dir})
+        session_id = response['session_id']
 
         if do_compile and full_warmup:
             try:
-                print("Warming up torch.compile (varying object counts)...")
+                print('Warming up torch.compile (varying object counts)...')
                 model_wrapper.model.warm_up_compilation()
             except Exception as e:
-                print(f"warm_up_compilation() failed ({e!r}); relying on lazy compile.")
+                print(f'warm_up_compilation() failed ({e!r}); relying on lazy compile.')
 
-        print("Warm-up rounds...")
+        print('Warm-up rounds...')
         fps = 0.0
         for _ in range(3):
-            fps = max(main_loop(model_wrapper, session_id, "circle"), fps)
+            fps = max(main_loop(model_wrapper, session_id, 'circle'), fps)
 
-        print("Timing rounds...")
+        print('Timing rounds...')
         for i in range(10):
             torch.cuda.empty_cache()
             torch.cuda.reset_peak_memory_stats()
-            f = main_loop(model_wrapper, session_id, "circle")
+            f = main_loop(model_wrapper, session_id, 'circle')
             best_fps = max(best_fps, f)
-            print(f"  round {i + 1}: {f:.2f} FPS")
+            print(f'  round {i + 1}: {f:.2f} FPS')
         max_memory_allocated()
 
     #
     # scene_service per-frame SAM3 cost: start_session(single image) + K add_prompt.
-    image_path = os.path.join(video_dir, "000.jpg")
+    image_path = os.path.join(video_dir, '000.jpg')
     scene_ms = {}
     for k in (1, 3):
-        labels = ["circle", "square", "triangle"][:k]
+        labels = ['circle', 'square', 'triangle'][:k]
         med, mn = time_scene_frame(model_wrapper, image_path, labels)
         scene_ms[k] = med
-        print(f"  scene per-frame K={k} labels: {med:.2f} ms median ({mn:.2f} ms min)")
+        print(f'  scene per-frame K={k} labels: {med:.2f} ms median ({mn:.2f} ms min)')
 
-    per_frame_ms = 1000.0 / best_fps if best_fps > 0 else float("nan")
+    per_frame_ms = 1000.0 / best_fps if best_fps > 0 else float('nan')
     print(
-        f"\n=== RESULT {mode}: "
-        f"scene/frame K=1 {scene_ms[1]:.2f} ms | K=3 {scene_ms[3]:.2f} ms | "
-        f"propagate {best_fps:.2f} FPS ({per_frame_ms:.2f} ms/frame) | "
-        f"num_objects={num_objects} {width}x{height} ==="
+        f'\n=== RESULT {mode}: '
+        f'scene/frame K=1 {scene_ms[1]:.2f} ms | K=3 {scene_ms[3]:.2f} ms | '
+        f'propagate {best_fps:.2f} FPS ({per_frame_ms:.2f} ms/frame) | '
+        f'num_objects={num_objects} {width}x{height} ==='
     )
     return best_fps
 
 
 def main() -> None:
     username = getpass.getuser()
-    os.environ["TORCHINDUCTOR_CACHE_DIR"] = f"/tmp/torchinductor_cache_{username}"
-    os.environ["USE_PERFLIB"] = "1"
+    os.environ['TORCHINDUCTOR_CACHE_DIR'] = f'/tmp/torchinductor_cache_{username}'
+    os.environ['USE_PERFLIB'] = '1'
 
-    parser = argparse.ArgumentParser(
-        description="SAM3 production-model torch.compile A/B benchmark"
-    )
-    parser.add_argument("--checkpoint", type=str, default="/tmp/sam3_v4.pt")
+    parser = argparse.ArgumentParser(description='SAM3 production-model torch.compile A/B benchmark')
+    parser.add_argument('--checkpoint', type=str, default='/tmp/sam3_v4.pt')
+    parser.add_argument('--video_dir', type=str, default='/tmp/sam3_bench_compile/synth_video')
+    parser.add_argument('--num_objects', type=int, default=5)
+    parser.add_argument('--n_frames', type=int, default=50)
+    parser.add_argument('--radius', type=int, default=50)
+    parser.add_argument('--speed', type=int, default=20)
+    parser.add_argument('--width', type=int, default=1024)
+    parser.add_argument('--height', type=int, default=1024)
     parser.add_argument(
-        "--video_dir", type=str, default="/tmp/sam3_bench_compile/synth_video"
-    )
-    parser.add_argument("--num_objects", type=int, default=5)
-    parser.add_argument("--n_frames", type=int, default=50)
-    parser.add_argument("--radius", type=int, default=50)
-    parser.add_argument("--speed", type=int, default=20)
-    parser.add_argument("--width", type=int, default=1024)
-    parser.add_argument("--height", type=int, default=1024)
-    parser.add_argument(
-        "--compile",
+        '--compile',
         action=argparse.BooleanOptionalAction,
         default=True,
-        help="torch.compile the model; use --no-compile for the eager baseline",
+        help='torch.compile the model; use --no-compile for the eager baseline',
     )
     parser.add_argument(
-        "--full-warmup",
-        action="store_true",
-        help="run prod warm_up_compilation (object-count sweep) instead of lazy compile",
+        '--full-warmup',
+        action='store_true',
+        help='run prod warm_up_compilation (object-count sweep) instead of lazy compile',
     )
     parser.add_argument(
-        "--native-warmup",
-        action="store_true",
-        help="mirror prod Sam3DenseTrackingModel.warmup: _compile_model() direct + "
-        "single-image warm only (no propagate); validates 0 serve-time recompiles",
+        '--native-warmup',
+        action='store_true',
+        help='mirror prod Sam3DenseTrackingModel.warmup: _compile_model() direct + '
+        'single-image warm only (no propagate); validates 0 serve-time recompiles',
     )
 
     args = parser.parse_args()
@@ -239,5 +231,5 @@ def main() -> None:
     )
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()

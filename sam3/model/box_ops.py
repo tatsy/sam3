@@ -195,9 +195,7 @@ def fast_diag_box_iou(boxes1, boxes2):
     return iou
 
 
-def box_xywh_inter_union(
-    boxes1: torch.Tensor, boxes2: torch.Tensor
-) -> Tuple[torch.Tensor, torch.Tensor]:
+def box_xywh_inter_union(boxes1: torch.Tensor, boxes2: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
     # Asuumes boxes in xywh format
     assert boxes1.size(-1) == 4 and boxes2.size(-1) == 4
     boxes1 = box_xywh_to_xyxy(boxes1)

@@ -29,7 +29,7 @@ from sam3.train.masks_ops import rle_encode
 from torch import nn, Tensor
 
 # a short 3-min timeout to quickly detect any synchronization failures
-SAM3_COLLECTIVE_OP_TIMEOUT_SEC = int(os.getenv("SAM3_COLLECTIVE_OP_TIMEOUT_SEC", "180"))
+SAM3_COLLECTIVE_OP_TIMEOUT_SEC = int(os.getenv('SAM3_COLLECTIVE_OP_TIMEOUT_SEC', '180'))
 
 logger = get_logger(__name__)
 
@@ -74,9 +74,9 @@ class Sam3MultiplexTrackerPredictor(nn.Module):
 
         # Ensure proper Hydra initialization
         if not GlobalHydra().is_initialized():
-            logger.info("Sam3MultiplexTrackerPredictor: GlobalHydra not initialized")
+            logger.info('Sam3MultiplexTrackerPredictor: GlobalHydra not initialized')
             GlobalHydra.instance().clear()
-            initialize_config_module("sam3.config", version_base="1.2")
+            initialize_config_module('sam3.config', version_base='1.2')
 
         if hydra_overrides is None:
             hydra_overrides = []
@@ -85,102 +85,100 @@ class Sam3MultiplexTrackerPredictor(nn.Module):
         self.per_obj_inference = per_obj_inference
 
         if self.is_multiplex:
-            inference_model_class = "sam3.model.video_tracking_multiplex_demo.Sam3VideoTrackingMultiplexDemo"
+            inference_model_class = 'sam3.model.video_tracking_multiplex_demo.Sam3VideoTrackingMultiplexDemo'
         else:
             inference_model_class = (
-                "sam3.model.video_tracking_with_prompt_demo_per_obj_inference.Sam3VideoTrackingWithPromptDemoPerObjInference"
+                'sam3.model.video_tracking_with_prompt_demo_per_obj_inference.Sam3VideoTrackingWithPromptDemoPerObjInference'
                 if per_obj_inference
-                else "sam3.model.video_tracking_with_prompt_demo.Sam3VideoTrackingWithPromptDemo"
+                else 'sam3.model.video_tracking_with_prompt_demo.Sam3VideoTrackingWithPromptDemo'
             )
         hydra_overrides = list(hydra_overrides)
         hydra_overrides.extend(
             [
                 "launcher.experiment_log_dir=''",
-                f"++trainer.model._target_={inference_model_class}",
+                f'++trainer.model._target_={inference_model_class}',
                 # Shared backbone cfg
-                "++trainer.model.image_size=1008",
-                "++trainer.model.backbone_stride=14",
-                "++trainer.model.maskmem_backbone.mask_downsampler.interpol_size=[1152,1152]",
-                "++trainer.model.backbone.forward_in_chunk_for_eval=false",
+                '++trainer.model.image_size=1008',
+                '++trainer.model.backbone_stride=14',
+                '++trainer.model.maskmem_backbone.mask_downsampler.interpol_size=[1152,1152]',
+                '++trainer.model.backbone.forward_in_chunk_for_eval=false',
                 # always start tracking from the frame where we receive the first annotation
                 # (clicks or mask) and ignore the `start_frame_idx` passed to `propagate_in_video`
-                "++trainer.model.always_start_from_first_ann_frame=false",
+                '++trainer.model.always_start_from_first_ann_frame=false',
                 # apply non-overlapping constraints on the object masks in the
                 # memory encoder to avoid/alleviate superposing mask predictions
-                "++trainer.model.non_overlap_masks_for_mem_enc=false",
+                '++trainer.model.non_overlap_masks_for_mem_enc=false',
                 # Do not apply non-overlapping constraints on the output
-                "++trainer.model.non_overlap_masks_for_output=false",
+                '++trainer.model.non_overlap_masks_for_output=false',
                 # attend to at most 4 temporally closest conditioning frames in the encoder for
                 # better temporal locality and a better handling to a large number of annotated frames
-                "++trainer.model.max_cond_frames_in_attn=4",
-                f"++trainer.model.keep_first_cond_frame={keep_first_cond_frame}",
+                '++trainer.model.max_cond_frames_in_attn=4',
+                f'++trainer.model.keep_first_cond_frame={keep_first_cond_frame}',
                 # turn off all offloading options in the demo (we handle them separately in the demo class)
-                "++trainer.model.offload_output_to_cpu_for_eval=false",
-                "++trainer.model.trim_past_non_cond_mem_for_eval=false",
+                '++trainer.model.offload_output_to_cpu_for_eval=false',
+                '++trainer.model.trim_past_non_cond_mem_for_eval=false',
                 # torch.compile on the image backbone (w/ `dynamic=false` and `fullgraph=true` to capture a full graph)
                 # "++trainer.model.backbone.compile_mode=max-autotune",
                 # "++trainer.model.backbone.compile_extra_args.fullgraph=true",
                 # "++trainer.model.backbone.compile_extra_args.dynamic=false",
-                "++trainer.model.backbone.visual.trunk.weights_path=null",
+                '++trainer.model.backbone.visual.trunk.weights_path=null',
                 # Postprocessing/demo options
                 # dynamically fall back to multi-mask if the single mask is not stable
-                "++trainer.model.sam_mask_decoder_extra_args.dynamic_multimask_via_stability=true",
-                "++trainer.model.sam_mask_decoder_extra_args.dynamic_multimask_stability_delta=0.05",
-                "++trainer.model.sam_mask_decoder_extra_args.dynamic_multimask_stability_thresh=0.98",
+                '++trainer.model.sam_mask_decoder_extra_args.dynamic_multimask_via_stability=true',
+                '++trainer.model.sam_mask_decoder_extra_args.dynamic_multimask_stability_delta=0.05',
+                '++trainer.model.sam_mask_decoder_extra_args.dynamic_multimask_stability_thresh=0.98',
                 # the sigmoid mask logits on interacted frames with clicks in the memory encoder so that the encoded masks are exactly as what users see from clicking
-                "++trainer.model.binarize_mask_from_pts_for_mem_enc=true",
+                '++trainer.model.binarize_mask_from_pts_for_mem_enc=true',
                 # only attend to object pointers in the past (before the current frame) in the encoder during evaluation
-                "++trainer.model.only_obj_ptrs_in_the_past_for_eval=true",
+                '++trainer.model.only_obj_ptrs_in_the_past_for_eval=true',
                 # clear non-conditioning memory of the surrounding frames (which may contain outdated information) after adding correction clicks
-                "++trainer.model.clear_non_cond_mem_around_input=true",
-                "++trainer.model.transformer.encoder.layer.self_attention.feat_sizes=[72,72]",
-                "++trainer.model.transformer.encoder.layer.cross_attention.feat_sizes=[72,72]",
+                '++trainer.model.clear_non_cond_mem_around_input=true',
+                '++trainer.model.transformer.encoder.layer.self_attention.feat_sizes=[72,72]',
+                '++trainer.model.transformer.encoder.layer.cross_attention.feat_sizes=[72,72]',
                 # fill small holes in the final masks up to `fill_hole_area` (after resizing them to the original video resolution)
-                f"++trainer.model.fill_hole_area={fill_hole_area}",
-                f"++trainer.model.transformer.encoder.layer.self_attention.use_fa3={use_fa3}",
-                f"++trainer.model.transformer.encoder.layer.cross_attention.use_fa3={use_fa3}",
-                f"++trainer.model.transformer.encoder.layer.self_attention.use_rope_real={use_rope_real}",
-                f"++trainer.model.transformer.encoder.layer.cross_attention.use_rope_real={use_rope_real}",
+                f'++trainer.model.fill_hole_area={fill_hole_area}',
+                f'++trainer.model.transformer.encoder.layer.self_attention.use_fa3={use_fa3}',
+                f'++trainer.model.transformer.encoder.layer.cross_attention.use_fa3={use_fa3}',
+                f'++trainer.model.transformer.encoder.layer.self_attention.use_rope_real={use_rope_real}',
+                f'++trainer.model.transformer.encoder.layer.cross_attention.use_rope_real={use_rope_real}',
             ]
         )
 
         if self.is_multiplex or self.is_multiplex_dynamic:
             hydra_overrides.extend(
                 [
-                    f"++trainer.model.transformer.encoder.layer.self_attention_rope.use_fa3={use_fa3}",
-                    f"++trainer.model.transformer.encoder.layer.cross_attention_rope.use_fa3={use_fa3}",
-                    f"++trainer.model.transformer.encoder.layer.self_attention_rope.use_rope_real={use_rope_real}",
-                    f"++trainer.model.transformer.encoder.layer.cross_attention_rope.use_rope_real={use_rope_real}",
+                    f'++trainer.model.transformer.encoder.layer.self_attention_rope.use_fa3={use_fa3}',
+                    f'++trainer.model.transformer.encoder.layer.cross_attention_rope.use_fa3={use_fa3}',
+                    f'++trainer.model.transformer.encoder.layer.self_attention_rope.use_rope_real={use_rope_real}',
+                    f'++trainer.model.transformer.encoder.layer.cross_attention_rope.use_rope_real={use_rope_real}',
                 ]
             )
 
-        hydra_overrides.extend(
-            [f"++trainer.model.use_memory_selection={use_memory_selection}"]
-        )
+        hydra_overrides.extend([f'++trainer.model.use_memory_selection={use_memory_selection}'])
 
         cfg = compose(config_name=config_file, overrides=hydra_overrides)
         model = instantiate(cfg.trainer.model, _recursive_=True)
         del model.backbone  # Remove backbone since it is shared with the sam3 model
         if checkpoint_file is not None:
-            ckpt = torch.load(checkpoint_file, map_location="cpu")
-            model.load_state_dict(ckpt["model"], strict=False)
+            ckpt = torch.load(checkpoint_file, map_location='cpu')
+            model.load_state_dict(ckpt['model'], strict=False)
         self.model = model
         self.per_obj_inference = per_obj_inference
         self.fill_hole_area = fill_hole_area
         # use bfloat16 inference for Flash Attention kernel
-        self.bf16_context = torch.autocast(device_type="cuda", dtype=torch.bfloat16)
+        self.bf16_context = torch.autocast(device_type='cuda', dtype=torch.bfloat16)
         self.bf16_context.__enter__()  # keep using for the entire model process
 
     def __getattr__(self, name):
         # Expose all attributes of the underlying model
-        model = super().__getattr__("model")
-        if name == "model":
+        model = super().__getattr__('model')
+        if name == 'model':
             return model
         return getattr(model, name)
 
     def forward(self, *args, **kwargs):
         raise NotImplementedError(
-            "Use the sam2 predictor APIs instead. Check VideoTrackingWithPromptDemo class for details."
+            'Use the sam2 predictor APIs instead. Check VideoTrackingWithPromptDemo class for details.'
         )
 
     def add_output_per_object(self, *args, **kwargs):
@@ -264,8 +262,8 @@ class Sam3MultiplexBase(Sam3VideoBase):
         assert isinstance(detector, Sam3MultiplexDetector)
         self.detector = detector
         if sam3_ckpt_path:
-            ckpt = torch.load(sam3_ckpt_path, map_location="cpu", weights_only=True)
-            self.detector.load_state_dict(ckpt["model"], strict=False)
+            ckpt = torch.load(sam3_ckpt_path, map_location='cpu', weights_only=True)
+            self.detector.load_state_dict(ckpt['model'], strict=False)
         elif ckpt_path:
             self._load_checkpoint(ckpt_path, strict=False)
         self.score_threshold_detection = score_threshold_detection
@@ -280,10 +278,8 @@ class Sam3MultiplexBase(Sam3VideoBase):
         # pyrefly: ignore [bad-argument-type]
         self.detector.running_in_prod = running_in_prod
 
-        assert (
-            self.is_multiplex == self.tracker.is_multiplex == self.detector.is_multiplex
-        ), (
-            f"is_multiplex must be the same for all models: {self.is_multiplex=}, {self.tracker.is_multiplex=}, {self.detector.is_multiplex=}"
+        assert self.is_multiplex == self.tracker.is_multiplex == self.detector.is_multiplex, (
+            f'is_multiplex must be the same for all models: {self.is_multiplex=}, {self.tracker.is_multiplex=}, {self.detector.is_multiplex=}'
         )
 
         # hotstart parameters
@@ -293,9 +289,7 @@ class Sam3MultiplexBase(Sam3VideoBase):
         self.hotstart_delay = hotstart_delay
         self.hotstart_unmatch_thresh = hotstart_unmatch_thresh
         self.hotstart_dup_thresh = hotstart_dup_thresh
-        self.suppress_unmatched_only_within_hotstart = (
-            suppress_unmatched_only_within_hotstart
-        )
+        self.suppress_unmatched_only_within_hotstart = suppress_unmatched_only_within_hotstart
         self.init_trk_keep_alive = init_trk_keep_alive
         self.max_trk_keep_alive = max_trk_keep_alive
         self.min_trk_keep_alive = min_trk_keep_alive
@@ -304,38 +298,30 @@ class Sam3MultiplexBase(Sam3VideoBase):
         )
         self.allow_unoccluded_to_suppress = allow_unoccluded_to_suppress
         self.suppress_det_close_to_boundary = suppress_det_close_to_boundary
-        self.decrease_trk_keep_alive_for_empty_masklets = (
-            decrease_trk_keep_alive_for_empty_masklets
-        )
+        self.decrease_trk_keep_alive_for_empty_masklets = decrease_trk_keep_alive_for_empty_masklets
         self.o2o_matching_masklets_enable = o2o_matching_masklets_enable
         self.fill_hole_area = fill_hole_area
         self.sprinkle_removal_area = sprinkle_removal_area
         self.eval()
-        self.rank = int(os.getenv("RANK", "0"))
-        self.world_size = int(os.getenv("WORLD_SIZE", "1"))
+        self.rank = int(os.getenv('RANK', '0'))
+        self.world_size = int(os.getenv('WORLD_SIZE', '1'))
         self._dist_pg_cpu = None  # CPU process group (lazy-initialized on first use)
 
         # Initialize profiling variables
         self._profiler = None
         self._frame_count = 0
-        self._profile_save_dir = os.getenv("PROFILE_SAVE_DIR", "/tmp/profiling")
-        self._profiling_enabled = os.getenv("ENABLE_PROFILING", "0").lower() == "1"
+        self._profile_save_dir = os.getenv('PROFILE_SAVE_DIR', '/tmp/profiling')
+        self._profiling_enabled = os.getenv('ENABLE_PROFILING', '0').lower() == '1'
 
         # the maximum object number
         if max_num_objects > 0:
-            multiplex_divisor = (
-                self.tracker.multiplex_controller.allowed_bucket_capacity
-                if self.is_multiplex
-                else 1
-            )
-            num_obj_for_compile = math.ceil(
-                max_num_objects / (self.world_size * multiplex_divisor)
-            )
+            multiplex_divisor = self.tracker.multiplex_controller.allowed_bucket_capacity if self.is_multiplex else 1
+            num_obj_for_compile = math.ceil(max_num_objects / (self.world_size * multiplex_divisor))
         else:
             max_num_objects = 10000  # no limit
             num_obj_for_compile = 16
         logger.info(
-            f"`setting max_num_objects` to {max_num_objects} -- creating {num_obj_for_compile=} objects for torch.compile cache"
+            f'`setting max_num_objects` to {max_num_objects} -- creating {num_obj_for_compile=} objects for torch.compile cache'
         )
         self.max_num_objects = max_num_objects
         self.num_obj_for_compile = num_obj_for_compile
@@ -345,26 +331,18 @@ class Sam3MultiplexBase(Sam3VideoBase):
         self.iom_thresh_recondition = iom_thresh_recondition
         self.iou_thresh_recondition = iou_thresh_recondition
         self.masklet_confirmation_enable = masklet_confirmation_enable
-        self.masklet_confirmation_consecutive_det_thresh = (
-            masklet_confirmation_consecutive_det_thresh
-        )
+        self.masklet_confirmation_consecutive_det_thresh = masklet_confirmation_consecutive_det_thresh
         self.reconstruction_bbox_iou_thresh = reconstruction_bbox_iou_thresh
         self.reconstruction_bbox_det_score = reconstruction_bbox_det_score
         self.reapply_no_object_pointer = reapply_no_object_pointer
 
         # Batched grounding configuration
         self.use_batched_grounding = use_batched_grounding
-        self.batched_grounding_batch_size = (
-            batched_grounding_batch_size  # Batch size for batched grounding
-        )
+        self.batched_grounding_batch_size = batched_grounding_batch_size  # Batch size for batched grounding
 
         if self.is_multiplex:
-            assert not self.tracker.multiplex_controller.training, (
-                "This model class should only be used for eval."
-            )
-            self.bucket_capacity: int = (
-                self.tracker.multiplex_controller.allowed_bucket_capacity
-            )
+            assert not self.tracker.multiplex_controller.training, 'This model class should only be used for eval.'
+            self.bucket_capacity: int = self.tracker.multiplex_controller.allowed_bucket_capacity
 
     def all_gather_cpu(self, tensor_list, tensor):
         if self._dist_pg_cpu is None:
@@ -382,13 +360,13 @@ class Sam3MultiplexBase(Sam3VideoBase):
         dist.broadcast(x, src=src, group=self._dist_pg_cpu)
 
     def _start_profiling(self, frame_idx):
-        self._profiling_enabled = os.getenv("ENABLE_PROFILING", "0").lower() == "1"
-        self._profile_end_frame = int(os.getenv("PROFILE_END_FRAME", "-1"))
+        self._profiling_enabled = os.getenv('ENABLE_PROFILING', '0').lower() == '1'
+        self._profile_end_frame = int(os.getenv('PROFILE_END_FRAME', '-1'))
         """Start profiling for _det_track_one_frame if conditions are met."""
         if not self._profiling_enabled:
             return False
 
-        if not getattr(self, "_warm_up_complete", False):
+        if not getattr(self, '_warm_up_complete', False):
             return False
 
         if self._profiler is not None:
@@ -396,9 +374,7 @@ class Sam3MultiplexBase(Sam3VideoBase):
 
         # Start profiling
         os.makedirs(self._profile_save_dir, exist_ok=True)
-        profile_path = os.path.join(
-            self._profile_save_dir, f"det_track_frame_rank_{self.rank}.json.gz"
-        )
+        profile_path = os.path.join(self._profile_save_dir, f'det_track_frame_rank_{self.rank}.json.gz')
 
         self._profiler = torch.profiler.profile(
             activities=[
@@ -406,13 +382,11 @@ class Sam3MultiplexBase(Sam3VideoBase):
                 torch.profiler.ProfilerActivity.CUDA,
             ],
             record_shapes=True,
-            experimental_config=torch.profiler._ExperimentalConfig(
-                profile_all_threads=True
-            ),
+            experimental_config=torch.profiler._ExperimentalConfig(profile_all_threads=True),
         )
         self._profiler.start()
         self._current_profile_path = profile_path
-        print(f"Started profiling frame on {frame_idx} on rank {self.rank}")
+        print(f'Started profiling frame on {frame_idx} on rank {self.rank}')
         return True
 
     def _stop_profiling(self):
@@ -420,13 +394,11 @@ class Sam3MultiplexBase(Sam3VideoBase):
         if self._profiler is not None:
             self._profiler.stop()
             self._profiler.export_chrome_trace(self._current_profile_path)
-            print(f"Profiling trace saved to: {self._current_profile_path}")
-            print(
-                f"You can open this file in Perfetto (https://ui.perfetto.dev/) to visualize the trace"
-            )
+            print(f'Profiling trace saved to: {self._current_profile_path}')
+            print(f'You can open this file in Perfetto (https://ui.perfetto.dev/) to visualize the trace')
             self._profiler = None
             self._profiling_enabled = False
-            os.environ["ENABLE_PROFILING"] = "0"
+            os.environ['ENABLE_PROFILING'] = '0'
 
     # pyre-fixme[14]: `_det_track_one_frame` overrides method defined in
     #  `Sam3VideoBase` inconsistently.
@@ -505,7 +477,7 @@ class Sam3MultiplexBase(Sam3VideoBase):
         # It returns a "det_out" dict for `frame_idx` and fills SAM2 backbone features for `frame_idx`
         # into `feature_cache`. Despite its distributed inference under the hood, the results would be
         # the same as if it is running backbone and FA for every frame on a single GPU.
-        with torch.profiler.record_function("run_backbone_and_detection"):
+        with torch.profiler.record_function('run_backbone_and_detection'):
             det_out, pos_pred_mask = self.run_backbone_and_detection(
                 frame_idx=frame_idx,
                 num_frames=num_frames,
@@ -522,34 +494,27 @@ class Sam3MultiplexBase(Sam3VideoBase):
         # gathered from all GPUs (as if they are propagated on a single GPU). Note that this step only
         # runs the SAM2 propagation step, but doesn't encode new memory for the predicted masks;
         # we defer memory encoding to `run_tracker_update_execution_phase` after resolving all heuristics.
-        with torch.profiler.record_function("run_tracker_propagation"):
+        with torch.profiler.record_function('run_tracker_propagation'):
             if tracker_metadata_prev == {}:
                 # initialize masklet metadata if it's uninitialized (empty dict)
                 tracker_metadata_prev.update(self._initialize_metadata())
-            tracker_low_res_masks_global, tracker_obj_scores_global = (
-                self.run_tracker_propagation(
-                    frame_idx=frame_idx,
-                    num_frames=num_frames,
-                    reverse=reverse,
-                    tracker_states_local=tracker_states_local,
-                    tracker_metadata_prev=tracker_metadata_prev,
-                )
+            tracker_low_res_masks_global, tracker_obj_scores_global = self.run_tracker_propagation(
+                frame_idx=frame_idx,
+                num_frames=num_frames,
+                reverse=reverse,
+                tracker_states_local=tracker_states_local,
+                tracker_metadata_prev=tracker_metadata_prev,
             )
 
-        with torch.profiler.record_function("GPU sync and filter"):
+        with torch.profiler.record_function('GPU sync and filter'):
             # Remove leading dimension (assumes batch size 1)
             assert pos_pred_mask.shape[0] == 1
             pos_pred_mask = pos_pred_mask.squeeze(0)
             det_out = {k: det_out[k][0] for k in det_out}
             # Move detections we'll actually keep at the top for future logic
             pos_pred_mask_idx = pos_pred_mask.argsort(descending=True)
-            pos_pred_mask = torch.index_select(
-                pos_pred_mask, dim=0, index=pos_pred_mask_idx
-            )
-            det_out = {
-                k: torch.index_select(det_out[k], dim=0, index=pos_pred_mask_idx)
-                for k in det_out
-            }
+            pos_pred_mask = torch.index_select(pos_pred_mask, dim=0, index=pos_pred_mask_idx)
+            det_out = {k: torch.index_select(det_out[k], dim=0, index=pos_pred_mask_idx) for k in det_out}
 
         # Step 3: based on detection outputs and the propagated SAM2 prediction masks, we make plans
         # for SAM2 masklet updates (i.e. which objects to add and remove, how to load-balance them, etc).
@@ -558,30 +523,26 @@ class Sam3MultiplexBase(Sam3VideoBase):
         # planning will be done on the master rank (GPU 0) and the resulting plan `sam2_update_plan` is
         # broadcasted to other GPUs (to be executed in a distributed manner). This step also generates the
         # new masklet metadata `tracker_metadata_new` (based on its previous version `tracker_metadata_prev`).
-        with torch.profiler.record_function("run_tracker_update_planning_phase"):
-            sam2_update_plan, tracker_metadata_new = (
-                self.run_tracker_update_planning_phase(
-                    frame_idx=frame_idx,
-                    num_frames=num_frames,
-                    reverse=reverse,
-                    det_out=det_out,
-                    det_keep=pos_pred_mask,
-                    tracker_low_res_masks_global=tracker_low_res_masks_global,
-                    tracker_obj_scores_global=tracker_obj_scores_global,
-                    tracker_metadata_prev=tracker_metadata_prev,
-                    tracker_states_local=tracker_states_local,
-                    is_image_only=is_image_only,
-                )
+        with torch.profiler.record_function('run_tracker_update_planning_phase'):
+            sam2_update_plan, tracker_metadata_new = self.run_tracker_update_planning_phase(
+                frame_idx=frame_idx,
+                num_frames=num_frames,
+                reverse=reverse,
+                det_out=det_out,
+                det_keep=pos_pred_mask,
+                tracker_low_res_masks_global=tracker_low_res_masks_global,
+                tracker_obj_scores_global=tracker_obj_scores_global,
+                tracker_metadata_prev=tracker_metadata_prev,
+                tracker_states_local=tracker_states_local,
+                is_image_only=is_image_only,
             )
 
         # Get reconditioning info from the update plan
-        reconditioned_obj_ids = sam2_update_plan.get("reconditioned_obj_ids", set())
-        det_to_matched_trk_obj_ids = sam2_update_plan.get(
-            "det_to_matched_trk_obj_ids", {}
-        )
+        reconditioned_obj_ids = sam2_update_plan.get('reconditioned_obj_ids', set())
+        det_to_matched_trk_obj_ids = sam2_update_plan.get('det_to_matched_trk_obj_ids', {})
 
         # Step 4: based on `sam2_update_plan`, each GPU executes the update w.r.t. its local SAM2 inference states
-        with torch.profiler.record_function("run_tracker_update_execution_phase"):
+        with torch.profiler.record_function('run_tracker_update_execution_phase'):
             tracker_states_local_new = self.run_tracker_update_execution_phase(
                 frame_idx=frame_idx,
                 num_frames=num_frames,
@@ -598,7 +559,7 @@ class Sam3MultiplexBase(Sam3VideoBase):
 
         # Step 5: finally, build the outputs for this frame (it only needs to be done on GPU 0 since
         # only GPU 0 will send outputs to the server).
-        with torch.profiler.record_function("build_outputs"):
+        with torch.profiler.record_function('build_outputs'):
             if self.rank == 0:
                 obj_id_to_mask = self.build_outputs(
                     frame_idx=frame_idx,
@@ -616,20 +577,20 @@ class Sam3MultiplexBase(Sam3VideoBase):
                     # pyrefly: ignore [bad-argument-type]
                     det_to_matched_trk_obj_ids=det_to_matched_trk_obj_ids,
                 )
-                obj_id_to_score = tracker_metadata_new["obj_id_to_score"]
+                obj_id_to_score = tracker_metadata_new['obj_id_to_score']
             else:
                 obj_id_to_mask, obj_id_to_score = {}, {}  # dummy outputs on other GPUs
         # a few statistics for the current frame as a part of the output
         frame_stats = {
-            "num_obj_tracked": np.sum(tracker_metadata_new["num_obj_per_gpu"]),
-            "num_obj_dropped": sam2_update_plan["num_obj_dropped_due_to_limit"],
+            'num_obj_tracked': np.sum(tracker_metadata_new['num_obj_per_gpu']),
+            'num_obj_dropped': sam2_update_plan['num_obj_dropped_due_to_limit'],
         }
         # add sam2 scores to metadata, it should be fired for frames except the first frame
         if tracker_obj_scores_global.shape[0] > 0:
             # Convert tracker_obj_scores_global to sigmoid scores before updating
             tracker_obj_scores_global = tracker_obj_scores_global.sigmoid()
-            sam2_obj_ids = tracker_metadata_prev["obj_ids_all_gpu"]
-            tracker_metadata_new["obj_id_to_sam2_score_frame_wise"][frame_idx].update(
+            sam2_obj_ids = tracker_metadata_prev['obj_ids_all_gpu']
+            tracker_metadata_new['obj_id_to_sam2_score_frame_wise'][frame_idx].update(
                 dict(zip(sam2_obj_ids, tracker_obj_scores_global))
             )
 
@@ -657,34 +618,30 @@ class Sam3MultiplexBase(Sam3VideoBase):
     ):
         # Step 1: if text feature is not cached in `feature_cache`, compute and cache it
         text_batch_key = tuple(input_batch.find_text_batch)
-        if "text" not in feature_cache or text_batch_key not in feature_cache["text"]:
+        if 'text' not in feature_cache or text_batch_key not in feature_cache['text']:
             # pyrefly: ignore [missing-attribute]
-            text_outputs = self.detector.backbone.forward_text(
-                input_batch.find_text_batch, device=self.device
-            )
+            text_outputs = self.detector.backbone.forward_text(input_batch.find_text_batch, device=self.device)
             # note: we only cache the text feature of the most recent prompt
-            feature_cache["text"] = {text_batch_key: text_outputs}
+            feature_cache['text'] = {text_batch_key: text_outputs}
         else:
-            text_outputs = feature_cache["text"][text_batch_key]
+            text_outputs = feature_cache['text'][text_batch_key]
 
         # Step 2: run backbone, FA detection, and post-processing with NMS
         # Extract max_frame_num_to_track from feature_cache if available
-        tracking_bounds = feature_cache.get("tracking_bounds", {})
-        max_frame_num_to_track = tracking_bounds.get("max_frame_num_to_track")
-        start_frame_idx = tracking_bounds.get("propagate_in_video_start_frame_idx")
+        tracking_bounds = feature_cache.get('tracking_bounds', {})
+        max_frame_num_to_track = tracking_bounds.get('max_frame_num_to_track')
+        start_frame_idx = tracking_bounds.get('propagate_in_video_start_frame_idx')
         backbone_out = {
-            "img_batch_all_stages": input_batch.img_batch,
+            'img_batch_all_stages': input_batch.img_batch,
             **text_outputs,
         }
 
         if use_batched_grounding:
             # Use fully batched forward_grounding approach
-            if "grounding_cache" not in feature_cache:
-                feature_cache["grounding_cache"] = {}
+            if 'grounding_cache' not in feature_cache:
+                feature_cache['grounding_cache'] = {}
 
-            with torch.profiler.record_function(
-                "forward_video_grounding_batched_multigpu"
-            ):
+            with torch.profiler.record_function('forward_video_grounding_batched_multigpu'):
                 sam3_image_out, _ = (
                     # pyrefly: ignore [not-callable]
                     self.detector.forward_video_grounding_batched_multigpu(
@@ -693,7 +650,7 @@ class Sam3MultiplexBase(Sam3VideoBase):
                         geometric_prompt=geometric_prompt,
                         frame_idx=frame_idx,
                         num_frames=num_frames,
-                        grounding_cache=feature_cache["grounding_cache"],
+                        grounding_cache=feature_cache['grounding_cache'],
                         track_in_reverse=reverse,
                         return_sam2_backbone_feats=True,
                         run_nms=self.det_nms_thresh > 0.0,
@@ -708,12 +665,12 @@ class Sam3MultiplexBase(Sam3VideoBase):
                 )
         else:
             # Use existing multi-GPU distributed approach
-            if "multigpu_buffer" not in feature_cache:
+            if 'multigpu_buffer' not in feature_cache:
                 # "multigpu_buffer" is a buffer cache used by `self.detector` and it needs
                 # to be passed to `forward_video_grounding_multigpu` for every call
-                feature_cache["multigpu_buffer"] = {}
+                feature_cache['multigpu_buffer'] = {}
 
-            with torch.profiler.record_function("forward_video_grounding_multigpu"):
+            with torch.profiler.record_function('forward_video_grounding_multigpu'):
                 # pyrefly: ignore [not-callable]
                 sam3_image_out, _ = self.detector.forward_video_grounding_multigpu(
                     backbone_out=backbone_out,
@@ -721,7 +678,7 @@ class Sam3MultiplexBase(Sam3VideoBase):
                     geometric_prompt=geometric_prompt,
                     frame_idx=frame_idx,
                     num_frames=num_frames,
-                    multigpu_buffer=feature_cache["multigpu_buffer"],
+                    multigpu_buffer=feature_cache['multigpu_buffer'],
                     track_in_reverse=reverse,
                     # also get the SAM2 backbone features
                     return_sam2_backbone_feats=True,
@@ -738,9 +695,9 @@ class Sam3MultiplexBase(Sam3VideoBase):
                 )
 
         # note: detections in `sam3_image_out` has already gone through NMS
-        pred_probs = sam3_image_out["pred_logits"].squeeze(-1).sigmoid()
-        pred_boxes_xyxy = sam3_image_out["pred_boxes_xyxy"]
-        pred_masks = sam3_image_out["pred_masks"]
+        pred_probs = sam3_image_out['pred_logits'].squeeze(-1).sigmoid()
+        pred_boxes_xyxy = sam3_image_out['pred_boxes_xyxy']
+        pred_masks = sam3_image_out['pred_masks']
         # get the positive detection outputs above threshold
         pos_pred_mask = pred_probs > self.score_threshold_detection
 
@@ -750,9 +707,9 @@ class Sam3MultiplexBase(Sam3VideoBase):
             pos_pred_mask = pos_pred_mask & keep
 
         det_out = {
-            "bbox": pred_boxes_xyxy,
-            "mask": pred_masks,
-            "scores": pred_probs,
+            'bbox': pred_boxes_xyxy,
+            'mask': pred_masks,
+            'scores': pred_probs,
         }
 
         # Step 3: build SAM2 backbone features and store them in `feature_cache`
@@ -763,43 +720,35 @@ class Sam3MultiplexBase(Sam3VideoBase):
             interaction_sam_mask_decoder = self.tracker.interactive_sam_mask_decoder
             interaction_backbone_fpn = [
                 # pyrefly: ignore [missing-attribute]
-                interaction_sam_mask_decoder.conv_s0(
-                    sam3_image_out["interactive_backbone_fpn_0"]
-                ),
+                interaction_sam_mask_decoder.conv_s0(sam3_image_out['interactive_backbone_fpn_0']),
                 # pyrefly: ignore [missing-attribute]
-                interaction_sam_mask_decoder.conv_s1(
-                    sam3_image_out["interactive_backbone_fpn_1"]
-                ),
-                sam3_image_out[
-                    "interactive_backbone_fpn_2"
-                ],  # fpn_2 doesn't need additional conv
+                interaction_sam_mask_decoder.conv_s1(sam3_image_out['interactive_backbone_fpn_1']),
+                sam3_image_out['interactive_backbone_fpn_2'],  # fpn_2 doesn't need additional conv
             ]
             interaction_backbone_out = {
-                "vision_features": interaction_backbone_fpn[-1],  # top-level feature
-                "vision_mask": None,
-                "vision_pos_enc": sam3_image_out["interactive_backbone_pos_enc"],
-                "backbone_fpn": [
-                    NestedTensor(x, None) for x in interaction_backbone_fpn
-                ],
+                'vision_features': interaction_backbone_fpn[-1],  # top-level feature
+                'vision_mask': None,
+                'vision_pos_enc': sam3_image_out['interactive_backbone_pos_enc'],
+                'backbone_fpn': [NestedTensor(x, None) for x in interaction_backbone_fpn],
             }
-            backbone_cache["interactive"] = interaction_backbone_out
+            backbone_cache['interactive'] = interaction_backbone_out
         sam_mask_decoder = self.tracker.sam_mask_decoder
         sam2_backbone_fpn = [
             # pyrefly: ignore [missing-attribute]
-            sam_mask_decoder.conv_s0(sam3_image_out["sam2_backbone_fpn_0"]),
+            sam_mask_decoder.conv_s0(sam3_image_out['sam2_backbone_fpn_0']),
             # pyrefly: ignore [missing-attribute]
-            sam_mask_decoder.conv_s1(sam3_image_out["sam2_backbone_fpn_1"]),
-            sam3_image_out["sam2_backbone_fpn_2"],  # fpn_2 doesn't need additional conv
+            sam_mask_decoder.conv_s1(sam3_image_out['sam2_backbone_fpn_1']),
+            sam3_image_out['sam2_backbone_fpn_2'],  # fpn_2 doesn't need additional conv
         ]
         sam2_backbone_out = {
-            "vision_features": sam2_backbone_fpn[-1],  # top-level feature
-            "vision_mask": None,
-            "vision_pos_enc": sam3_image_out["sam2_backbone_pos_enc"],
-            "backbone_fpn": [NestedTensor(x, None) for x in sam2_backbone_fpn],
+            'vision_features': sam2_backbone_fpn[-1],  # top-level feature
+            'vision_mask': None,
+            'vision_pos_enc': sam3_image_out['sam2_backbone_pos_enc'],
+            'backbone_fpn': [NestedTensor(x, None) for x in sam2_backbone_fpn],
         }
-        backbone_cache["sam2_backbone_out"] = sam2_backbone_out
+        backbone_cache['sam2_backbone_out'] = sam2_backbone_out
 
-        with torch.profiler.record_function("run_backbone_and_detection.feature_cache"):
+        with torch.profiler.record_function('run_backbone_and_detection.feature_cache'):
             feature_cache[frame_idx] = (
                 # pyre-fixme[16]: `Tensor` has no attribute `tensors`.
                 input_batch.img_batch.tensors[frame_idx],
@@ -821,38 +770,33 @@ class Sam3MultiplexBase(Sam3VideoBase):
         # `low_res_masks_local` of the existing masklets on this GPU
         # - obj_ids_local: List[int] -- list of object IDs
         # - low_res_masks_local: Tensor -- (num_local_obj, H_mask, W_mask)
-        with torch.profiler.record_function("propagate_tracker_one_frame_local_gpu"):
-            obj_ids_local, low_res_masks_local, obj_scores_local = (
-                self._propogate_tracker_one_frame_local_gpu(
-                    tracker_states_local, frame_idx=frame_idx, reverse=reverse
-                )
+        with torch.profiler.record_function('propagate_tracker_one_frame_local_gpu'):
+            obj_ids_local, low_res_masks_local, obj_scores_local = self._propogate_tracker_one_frame_local_gpu(
+                tracker_states_local, frame_idx=frame_idx, reverse=reverse
             )
 
-        assert np.all(
-            obj_ids_local == tracker_metadata_prev["obj_ids_per_gpu"][self.rank]
-        ), "{} != {}".format(
-            obj_ids_local, tracker_metadata_prev["obj_ids_per_gpu"][self.rank]
+        assert np.all(obj_ids_local == tracker_metadata_prev['obj_ids_per_gpu'][self.rank]), '{} != {}'.format(
+            obj_ids_local, tracker_metadata_prev['obj_ids_per_gpu'][self.rank]
         )
 
         # Step 2: all-gather `low_res_masks_local` into `low_res_masks_global`
         # - low_res_masks_global: Tensor -- (num_global_obj, H_mask, W_mask)
-        with torch.profiler.record_function("all_gather_low_res_masks_local"):
+        with torch.profiler.record_function('all_gather_low_res_masks_local'):
             _, H_mask, W_mask = low_res_masks_local.shape
             if self.world_size > 1:
                 # `low_res_masks_local` and `obj_scores_local` need to be contiguous and float32
                 # (they could be non-contiguous due to slicing and/or bfloat16 due to autocast)
                 low_res_masks_local = low_res_masks_local.float().contiguous()
                 obj_scores_local = obj_scores_local.float().contiguous()
-                num_obj_this_gpu = tracker_metadata_prev["num_obj_per_gpu"][self.rank]
+                num_obj_this_gpu = tracker_metadata_prev['num_obj_per_gpu'][self.rank]
                 assert low_res_masks_local.size(0) == num_obj_this_gpu
                 assert obj_scores_local.size(0) == num_obj_this_gpu
                 low_res_masks_peers = [
                     low_res_masks_local.new_empty(num_obj, H_mask, W_mask)
-                    for num_obj in tracker_metadata_prev["num_obj_per_gpu"]
+                    for num_obj in tracker_metadata_prev['num_obj_per_gpu']
                 ]
                 obj_scores_peers = [
-                    obj_scores_local.new_empty(num_obj)
-                    for num_obj in tracker_metadata_prev["num_obj_per_gpu"]
+                    obj_scores_local.new_empty(num_obj) for num_obj in tracker_metadata_prev['num_obj_per_gpu']
                 ]
                 dist.all_gather(low_res_masks_peers, low_res_masks_local)
                 dist.all_gather(obj_scores_peers, obj_scores_local)
@@ -887,15 +831,11 @@ class Sam3MultiplexBase(Sam3VideoBase):
         det_indices = list(trk_id_to_max_iou_high_conf_det.values())
 
         # Convert obj_ids_all_gpu to tensor once (keep on GPU)
-        obj_ids_all_gpu_t = torch.from_numpy(tracker_metadata["obj_ids_all_gpu"]).to(
+        obj_ids_all_gpu_t = torch.from_numpy(tracker_metadata['obj_ids_all_gpu']).to(
             device=tracker_obj_scores_global.device
         )
-        trk_obj_ids_t = torch.tensor(
-            trk_obj_ids, device=tracker_obj_scores_global.device
-        )
-        det_indices_t = torch.tensor(
-            det_indices, device=tracker_obj_scores_global.device
-        )
+        trk_obj_ids_t = torch.tensor(trk_obj_ids, device=tracker_obj_scores_global.device)
+        det_indices_t = torch.tensor(det_indices, device=tracker_obj_scores_global.device)
 
         # Batched lookup: find obj_idx for each trk_obj_id
         # Shape: (num_trk, num_all_obj) -> find matching indices
@@ -910,24 +850,18 @@ class Sam3MultiplexBase(Sam3VideoBase):
         high_conf_mask_cpu = high_conf_mask.cpu().numpy()
 
         # Filter to only high-confidence items
-        valid_trk_obj_ids = [
-            tid for tid, valid in zip(trk_obj_ids, high_conf_mask_cpu) if valid
-        ]
-        valid_det_indices = [
-            did for did, valid in zip(det_indices, high_conf_mask_cpu) if valid
-        ]
+        valid_trk_obj_ids = [tid for tid, valid in zip(trk_obj_ids, high_conf_mask_cpu) if valid]
+        valid_det_indices = [did for did, valid in zip(det_indices, high_conf_mask_cpu) if valid]
         valid_obj_indices = obj_indices_t[high_conf_mask]  # Keep as tensor
 
         if len(valid_trk_obj_ids) == 0:
             return tracker_states_local, reconditioned_obj_ids
 
         # === BATCH MASK OPERATIONS ===
-        valid_det_indices_t = torch.tensor(
-            valid_det_indices, device=det_out["mask"].device
-        )
+        valid_det_indices_t = torch.tensor(valid_det_indices, device=det_out['mask'].device)
 
         # Batch fetch all detection masks at once
-        new_masks = det_out["mask"][valid_det_indices_t]  # (K, H, W)
+        new_masks = det_out['mask'][valid_det_indices_t]  # (K, H, W)
         new_masks_binary = (
             F.interpolate(
                 new_masks.unsqueeze(1),
@@ -935,7 +869,7 @@ class Sam3MultiplexBase(Sam3VideoBase):
                     input_mask_res,
                     input_mask_res,
                 ),  # pyrefly: ignore [bad-argument-type]
-                mode="bilinear",
+                mode='bilinear',
                 align_corners=False,
             ).squeeze(1)
             > 0
@@ -963,23 +897,17 @@ class Sam3MultiplexBase(Sam3VideoBase):
             state_to_recondition_info = {}
             for i, trk_obj_id in enumerate(valid_trk_obj_ids):
                 for state_idx, inference_state in enumerate(tracker_states_local):
-                    if trk_obj_id in inference_state["obj_ids"]:
+                    if trk_obj_id in inference_state['obj_ids']:
                         if state_idx not in state_to_recondition_info:
                             state_to_recondition_info[state_idx] = []
-                        state_to_recondition_info[state_idx].append(
-                            (trk_obj_id, new_masks_binary[i])
-                        )
+                        state_to_recondition_info[state_idx].append((trk_obj_id, new_masks_binary[i]))
                         break
 
             for state_idx, recondition_list in state_to_recondition_info.items():
                 inference_state = tracker_states_local[state_idx]
                 obj_ids_to_recondition = [item[0] for item in recondition_list]
-                masks_to_recondition = torch.stack(
-                    [item[1] for item in recondition_list]
-                )
-                with torch.profiler.record_function(
-                    "_recodition_masklets.add_new_masks"
-                ):
+                masks_to_recondition = torch.stack([item[1] for item in recondition_list])
+                with torch.profiler.record_function('_recodition_masklets.add_new_masks'):
                     # pyrefly: ignore [not-callable]
                     self.tracker.add_new_masks(
                         inference_state=inference_state,
@@ -988,12 +916,12 @@ class Sam3MultiplexBase(Sam3VideoBase):
                         masks=masks_to_recondition,
                         reconditioning=True,
                     )
-                reconditioned_obj_ids.update(inference_state["obj_idx_to_id"].values())
+                reconditioned_obj_ids.update(inference_state['obj_idx_to_id'].values())
         else:
             # Non-multiplex: still iterate but masks already computed
             for i, trk_obj_id in enumerate(valid_trk_obj_ids):
                 for inference_state in tracker_states_local:
-                    if trk_obj_id in inference_state["obj_ids"]:
+                    if trk_obj_id in inference_state['obj_ids']:
                         # pyrefly: ignore [not-callable]
                         self.tracker.add_new_mask(
                             inference_state=inference_state,
@@ -1001,9 +929,7 @@ class Sam3MultiplexBase(Sam3VideoBase):
                             obj_id=trk_obj_id,
                             mask=new_masks_binary[i],
                         )
-                        reconditioned_obj_ids.update(
-                            inference_state["obj_idx_to_id"].values()
-                        )
+                        reconditioned_obj_ids.update(inference_state['obj_idx_to_id'].values())
                         break
 
         return tracker_states_local, reconditioned_obj_ids
@@ -1030,59 +956,51 @@ class Sam3MultiplexBase(Sam3VideoBase):
         is_image_only: bool = False,
     ):
         # initialize new metadata from previous metadata (its values will be updated later)
-        with torch.profiler.record_function("initialize_tracker_metadata_new"):
+        with torch.profiler.record_function('initialize_tracker_metadata_new'):
             tracker_metadata_new = self._create_planning_metadata(tracker_metadata_prev)
 
         # Initialize reconditioned_obj_ids early to avoid UnboundLocalError
         reconditioned_obj_ids = set()
 
         # Step 1: make the update plan and resolve heuristics on GPU 0
-        det_mask_preds: Tensor = det_out["mask"]  # low-res mask logits
-        det_scores: Tensor = det_out["scores"].float()
+        det_mask_preds: Tensor = det_out['mask']  # low-res mask logits
+        det_scores: Tensor = det_out['scores'].float()
         # a) match FA and SAM2 masks and find new objects
-        with torch.profiler.record_function("associate_det_trk"):
+        with torch.profiler.record_function('associate_det_trk'):
             adt_result = self._associate_det_trk(
                 det_masks=det_mask_preds,
                 det_scores=det_scores,
                 det_keep=det_keep,
                 trk_masks=tracker_low_res_masks_global,
-                trk_obj_ids=tracker_metadata_prev["obj_ids_all_gpu"],
-                default_det_thresh=(
-                    self.image_only_det_thresh if is_image_only else None
-                ),
+                trk_obj_ids=tracker_metadata_prev['obj_ids_all_gpu'],
+                default_det_thresh=(self.image_only_det_thresh if is_image_only else None),
             )
 
         # b) handle hotstart heuristics to remove objects (GPU-vectorized, no sync!)
         # here `rank0_metadata` contains metadata stored on (and only accessible to) GPU 0;
         # we avoid broadcasting them to other GPUs to save communication cost, assuming
         # that `rank0_metadata` is not needed by other GPUs
-        rank0_metadata_new = self._deepcopy(tracker_metadata_prev["rank0_metadata"])
-        if not hasattr(self, "_warm_up_complete") or self._warm_up_complete:
+        rank0_metadata_new = self._deepcopy(tracker_metadata_prev['rank0_metadata'])
+        if not hasattr(self, '_warm_up_complete') or self._warm_up_complete:
             # Call GPU-vectorized hotstart using lazy adt_result (NO realize_adt yet!)
-            with torch.profiler.record_function("_process_hotstart_gpu"):
-                to_remove_mask, to_suppress_mask, gpu_metadata_new = (
-                    self._process_hotstart_gpu(
-                        frame_idx=frame_idx,
-                        reverse=reverse,
-                        adt_result=adt_result,  # Still lazy - no sync!
-                        tracker_metadata_prev=tracker_metadata_prev,
-                        # pyre-fixme[6]: For 5th argument expected `Dict[str,
-                        #  Tensor]` but got `ndarray`.
-                        gpu_metadata_prev=tracker_metadata_prev["gpu_metadata"],
-                    )
+            with torch.profiler.record_function('_process_hotstart_gpu'):
+                to_remove_mask, to_suppress_mask, gpu_metadata_new = self._process_hotstart_gpu(
+                    frame_idx=frame_idx,
+                    reverse=reverse,
+                    adt_result=adt_result,  # Still lazy - no sync!
+                    tracker_metadata_prev=tracker_metadata_prev,
+                    # pyre-fixme[6]: For 5th argument expected `Dict[str,
+                    #  Tensor]` but got `ndarray`.
+                    gpu_metadata_prev=tracker_metadata_prev['gpu_metadata'],
                 )
             # IMPORTANT: From this point, tracker_metadata_new["gpu_metadata"] is updated but CPU metadata (obj_ids_all_gpu, etc.) is NOT
-            tracker_metadata_new["gpu_metadata"] = gpu_metadata_new
+            tracker_metadata_new['gpu_metadata'] = gpu_metadata_new
         else:
             # if warm-up is not complete, we don't remove any objects
             N_obj = tracker_low_res_masks_global.size(0)
-            to_remove_mask = torch.zeros(
-                N_obj, dtype=torch.bool, device=tracker_low_res_masks_global.device
-            )
-            to_suppress_mask = torch.zeros(
-                N_obj, dtype=torch.bool, device=tracker_low_res_masks_global.device
-            )
-        tracker_metadata_new["rank0_metadata"] = rank0_metadata_new
+            to_remove_mask = torch.zeros(N_obj, dtype=torch.bool, device=tracker_low_res_masks_global.device)
+            to_suppress_mask = torch.zeros(N_obj, dtype=torch.bool, device=tracker_low_res_masks_global.device)
+        tracker_metadata_new['rank0_metadata'] = rank0_metadata_new
 
         # Step 3 (optional): recondition masklets based on high-confidence detections before memory encoding
         # NOTE: Running this in execution phase (after memory encoding) can lead to suboptimal results
@@ -1090,9 +1008,7 @@ class Sam3MultiplexBase(Sam3VideoBase):
 
         # Evaluate tracklets for reconditioning based on bbox IoU mismatch with detections
         if self.reconstruction_bbox_iou_thresh > 0:
-            adt_result = realize_adt_result(
-                adt_result, tracker_metadata_prev, det_mask_preds
-            )
+            adt_result = realize_adt_result(adt_result, tracker_metadata_prev, det_mask_preds)
         if (
             self.reconstruction_bbox_iou_thresh > 0
             and len(
@@ -1100,12 +1016,10 @@ class Sam3MultiplexBase(Sam3VideoBase):
             )  # pyrefly: ignore [missing-attribute]
             > 0  # pyrefly: ignore [missing-attribute]
         ):
-            with torch.profiler.record_function(
-                "evaluate_reconstruction_bbox_iou_thresh"
-            ):
+            with torch.profiler.record_function('evaluate_reconstruction_bbox_iou_thresh'):
                 # pyrefly: ignore [missing-attribute]
                 trk_obj_ids = adt_result.trk_id_to_max_iou_high_conf_det.keys()
-                sam2_obj_ids_all_gpu = list(tracker_metadata_prev["obj_ids_all_gpu"])
+                sam2_obj_ids_all_gpu = list(tracker_metadata_prev['obj_ids_all_gpu'])
                 trk_ids = [
                     sam2_obj_ids_all_gpu.index(trk_obj_id)
                     for trk_obj_id in trk_obj_ids
@@ -1114,8 +1028,8 @@ class Sam3MultiplexBase(Sam3VideoBase):
                 # pyrefly: ignore [missing-attribute]
                 det_ids = list(adt_result.trk_id_to_max_iou_high_conf_det.values())
 
-                det_boxes_bbox_iou = det_out["bbox"][det_ids]
-                det_scores_bbox_iou = det_out["scores"][det_ids]
+                det_boxes_bbox_iou = det_out['bbox'][det_ids]
+                det_scores_bbox_iou = det_out['scores'][det_ids]
                 sam2_mask = tracker_low_res_masks_global[trk_ids]
                 mask_binary = sam2_mask > 0
                 sam2_box_pixels = mask_to_box(mask_binary.unsqueeze(1)).squeeze(1)
@@ -1130,13 +1044,8 @@ class Sam3MultiplexBase(Sam3VideoBase):
                 ):
                     should_recondition_iou = True
 
-        if (
-            self.recondition_every_nth_frame > 0
-            and frame_idx % self.recondition_every_nth_frame == 0
-        ):
-            adt_result = realize_adt_result(
-                adt_result, tracker_metadata_prev, det_mask_preds
-            )
+        if self.recondition_every_nth_frame > 0 and frame_idx % self.recondition_every_nth_frame == 0:
+            adt_result = realize_adt_result(adt_result, tracker_metadata_prev, det_mask_preds)
 
         should_recondition_periodic = (
             self.recondition_every_nth_frame > 0
@@ -1149,54 +1058,41 @@ class Sam3MultiplexBase(Sam3VideoBase):
 
         # Recondition if periodic or IoU condition met
         if should_recondition_periodic or should_recondition_iou:
-            adt_result = realize_adt_result(
-                adt_result, tracker_metadata_prev, det_mask_preds
-            )
+            adt_result = realize_adt_result(adt_result, tracker_metadata_prev, det_mask_preds)
             # NOTE: sam2_low_res_mask_global is modified in-place on all GPUs.
-            with torch.profiler.record_function("_recondition_masklets"):
-                tracker_states_local, reconditioned_obj_ids = (
-                    self._recondition_masklets(
-                        frame_idx,
-                        det_out,
-                        adt_result.trk_id_to_max_iou_high_conf_det,
-                        tracker_states_local,
-                        tracker_metadata_prev,
-                        tracker_obj_scores_global,
-                        tracker_low_res_masks_global,
-                    )
+            with torch.profiler.record_function('_recondition_masklets'):
+                tracker_states_local, reconditioned_obj_ids = self._recondition_masklets(
+                    frame_idx,
+                    det_out,
+                    adt_result.trk_id_to_max_iou_high_conf_det,
+                    tracker_states_local,
+                    tracker_metadata_prev,
+                    tracker_obj_scores_global,
+                    tracker_low_res_masks_global,
                 )
 
             for state in tracker_states_local:
-                if any(
-                    obj_id in reconditioned_obj_ids
-                    for obj_id in state.get("obj_ids", [])
-                ):
+                if any(obj_id in reconditioned_obj_ids for obj_id in state.get('obj_ids', [])):
                     # pyrefly: ignore [not-callable]
-                    self.tracker.propagate_in_video_preflight(
-                        state, run_mem_encoder=True
-                    )
+                    self.tracker.propagate_in_video_preflight(state, run_mem_encoder=True)
 
         # Step 4: Run SAM2 memory encoder on the current frame's prediction masks
         # This is done on all GPUs
         batch_size = tracker_low_res_masks_global.size(0)
         if batch_size > 0:
-            if not hasattr(self, "_warm_up_complete") or self._warm_up_complete:
+            if not hasattr(self, '_warm_up_complete') or self._warm_up_complete:
                 if self.suppress_overlapping_based_on_recent_occlusion_threshold > 0.0:
                     # NOTE: tracker_low_res_masks_global is updated in-place then returned
-                    with torch.profiler.record_function(
-                        "_suppress_overlapping_based_on_recent_occlusion"
-                    ):
-                        tracker_low_res_masks_global = (
-                            self._suppress_overlapping_based_on_recent_occlusion(
-                                frame_idx,
-                                tracker_low_res_masks_global,
-                                tracker_metadata_prev,
-                                tracker_metadata_new,
-                                to_remove_mask,  # GPU boolean mask, no sync!
-                                reverse,
-                            )
+                    with torch.profiler.record_function('_suppress_overlapping_based_on_recent_occlusion'):
+                        tracker_low_res_masks_global = self._suppress_overlapping_based_on_recent_occlusion(
+                            frame_idx,
+                            tracker_low_res_masks_global,
+                            tracker_metadata_prev,
+                            tracker_metadata_new,
+                            to_remove_mask,  # GPU boolean mask, no sync!
+                            reverse,
                         )
-            with torch.profiler.record_function("_tracker_update_memories"):
+            with torch.profiler.record_function('_tracker_update_memories'):
                 self._tracker_update_memories(
                     tracker_states_local,
                     frame_idx,
@@ -1205,18 +1101,14 @@ class Sam3MultiplexBase(Sam3VideoBase):
                 )
 
         # NOW realize adt_result after memory encoding (sync only for GPU load balancing)
-        adt_result = realize_adt_result(
-            adt_result, tracker_metadata_prev, det_mask_preds
-        )
-        new_det_obj_ids, new_det_gpu_ids, num_obj_dropped_due_to_limit = (
-            adt_result.get_new_det_gpu_ids(
-                tracker_metadata_prev, is_image_only, det_scores, self
-            )
+        adt_result = realize_adt_result(adt_result, tracker_metadata_prev, det_mask_preds)
+        new_det_obj_ids, new_det_gpu_ids, num_obj_dropped_due_to_limit = adt_result.get_new_det_gpu_ids(
+            tracker_metadata_prev, is_image_only, det_scores, self
         )
 
         # Convert GPU removal mask to CPU obj_id set for metadata updates
-        if not hasattr(self, "_warm_up_complete") or self._warm_up_complete:
-            obj_ids_all_gpu = tracker_metadata_prev["obj_ids_all_gpu"]
+        if not hasattr(self, '_warm_up_complete') or self._warm_up_complete:
+            obj_ids_all_gpu = tracker_metadata_prev['obj_ids_all_gpu']
             to_remove_cpu = to_remove_mask.cpu().numpy()
             obj_ids_newly_removed = set(obj_ids_all_gpu[to_remove_cpu].tolist())
         else:
@@ -1227,136 +1119,109 @@ class Sam3MultiplexBase(Sam3VideoBase):
         # the updated `tracker_metadata_new` should be identical on all GPUs
         for rank in range(self.world_size):
             new_det_obj_ids_this_gpu = new_det_obj_ids[new_det_gpu_ids == rank]
-            updated_obj_ids_this_gpu = tracker_metadata_new["obj_ids_per_gpu"][rank]
+            updated_obj_ids_this_gpu = tracker_metadata_new['obj_ids_per_gpu'][rank]
             if len(new_det_obj_ids_this_gpu) > 0:
-                updated_obj_ids_this_gpu = np.concatenate(
-                    [updated_obj_ids_this_gpu, new_det_obj_ids_this_gpu]
-                )
+                updated_obj_ids_this_gpu = np.concatenate([updated_obj_ids_this_gpu, new_det_obj_ids_this_gpu])
             if len(obj_ids_newly_removed) > 0:
-                is_removed = np.isin(
-                    updated_obj_ids_this_gpu, list(obj_ids_newly_removed)
-                )
+                is_removed = np.isin(updated_obj_ids_this_gpu, list(obj_ids_newly_removed))
                 updated_obj_ids_this_gpu = updated_obj_ids_this_gpu[~is_removed]
-            tracker_metadata_new["obj_ids_per_gpu"][rank] = updated_obj_ids_this_gpu
-            tracker_metadata_new["num_obj_per_gpu"][rank] = len(
-                updated_obj_ids_this_gpu
-            )
-        tracker_metadata_new["obj_ids_all_gpu"] = np.concatenate(
-            tracker_metadata_new["obj_ids_per_gpu"]
-        )
+            tracker_metadata_new['obj_ids_per_gpu'][rank] = updated_obj_ids_this_gpu
+            tracker_metadata_new['num_obj_per_gpu'][rank] = len(updated_obj_ids_this_gpu)
+        tracker_metadata_new['obj_ids_all_gpu'] = np.concatenate(tracker_metadata_new['obj_ids_per_gpu'])
         # update object scores and the maximum object ID assigned so far
         if len(new_det_obj_ids) > 0:
             det_scores_np: np.ndarray = det_scores.cpu().numpy()
-            tracker_metadata_new["obj_id_to_score"].update(
+            tracker_metadata_new['obj_id_to_score'].update(
                 zip(new_det_obj_ids, det_scores_np[adt_result.new_det_fa_inds])
             )
             # sam2 scores are not available for new objects, use det score instead.
             # Store as GPU tensors for consistency with SAM2 propagation scores
             new_det_scores_tensor = det_scores[adt_result.new_det_fa_inds]
-            tracker_metadata_new["obj_id_to_sam2_score_frame_wise"][frame_idx].update(
+            tracker_metadata_new['obj_id_to_sam2_score_frame_wise'][frame_idx].update(
                 zip(new_det_obj_ids, new_det_scores_tensor)
             )
-            tracker_metadata_new["max_obj_id"] = max(
-                tracker_metadata_new["max_obj_id"],
+            tracker_metadata_new['max_obj_id'] = max(
+                tracker_metadata_new['max_obj_id'],
                 np.max(new_det_obj_ids),
             )
         # for removed objects, we set their scores to a very low value (-1e4) but still
         # keep them in "obj_id_to_score" (it's easier to handle outputs this way)
         for obj_id in obj_ids_newly_removed:
-            tracker_metadata_new["obj_id_to_score"][obj_id] = -1e4
+            tracker_metadata_new['obj_id_to_score'][obj_id] = -1e4
             # Store as GPU tensor for consistency
-            tracker_metadata_new["obj_id_to_sam2_score_frame_wise"][frame_idx][
-                obj_id
-            ] = torch.tensor(-1e4, dtype=torch.float32, device=det_scores.device)
-            tracker_metadata_new["obj_id_to_last_occluded"].pop(obj_id, None)
+            tracker_metadata_new['obj_id_to_sam2_score_frame_wise'][frame_idx][obj_id] = torch.tensor(
+                -1e4, dtype=torch.float32, device=det_scores.device
+            )
+            tracker_metadata_new['obj_id_to_last_occluded'].pop(obj_id, None)
         # check that "rank0_metadata" is in tracker_metadata_new if and only if it's GPU 0
-        assert "rank0_metadata" in tracker_metadata_new
+        assert 'rank0_metadata' in tracker_metadata_new
         if self.masklet_confirmation_enable:
-            with torch.profiler.record_function("update_masklet_confirmation_status"):
+            with torch.profiler.record_function('update_masklet_confirmation_status'):
                 rank0_metadata = self.update_masklet_confirmation_status(
-                    rank0_metadata=tracker_metadata_new["rank0_metadata"],
-                    obj_ids_all_gpu_prev=tracker_metadata_prev["obj_ids_all_gpu"],
-                    obj_ids_all_gpu_updated=tracker_metadata_new["obj_ids_all_gpu"],
+                    rank0_metadata=tracker_metadata_new['rank0_metadata'],
+                    obj_ids_all_gpu_prev=tracker_metadata_prev['obj_ids_all_gpu'],
+                    obj_ids_all_gpu_updated=tracker_metadata_new['obj_ids_all_gpu'],
                     det_to_matched_trk_obj_ids=adt_result.det_to_matched_trk_obj_ids,
                     new_det_obj_ids=new_det_obj_ids,
                 )
-                tracker_metadata_new["rank0_metadata"] = rank0_metadata
+                tracker_metadata_new['rank0_metadata'] = rank0_metadata
 
         # Compact GPU metadata NOW (after sync) in preparation for next frame
         # This removes entries for objects that will be deleted in execution phase
         # so next frame's _process_hotstart_gpu doesn't need to do sync-inducing compaction
-        if not hasattr(self, "_warm_up_complete") or self._warm_up_complete:
-            if (
-                "gpu_metadata" in tracker_metadata_new
-                and tracker_metadata_new["gpu_metadata"].get("N_obj", 0) > 0
-            ):
-                with torch.profiler.record_function("compact_gpu_metadata"):
-                    gpu_meta = tracker_metadata_new["gpu_metadata"]
-                    removed_mask = gpu_meta[
-                        "removed_mask"
-                    ]  # (N_obj,) - which objects marked for removal
+        if not hasattr(self, '_warm_up_complete') or self._warm_up_complete:
+            if 'gpu_metadata' in tracker_metadata_new and tracker_metadata_new['gpu_metadata'].get('N_obj', 0) > 0:
+                with torch.profiler.record_function('compact_gpu_metadata'):
+                    gpu_meta = tracker_metadata_new['gpu_metadata']
+                    removed_mask = gpu_meta['removed_mask']  # (N_obj,) - which objects marked for removal
                     keep_indices = torch.nonzero(~removed_mask, as_tuple=True)[0]
 
-                    gpu_meta["obj_first_frame"] = gpu_meta["obj_first_frame"][
-                        keep_indices
-                    ]
-                    gpu_meta["consecutive_unmatch_count"] = gpu_meta[
-                        "consecutive_unmatch_count"
-                    ][keep_indices]
-                    gpu_meta["trk_keep_alive"] = gpu_meta["trk_keep_alive"][
-                        keep_indices
-                    ]
-                    gpu_meta["removed_mask"] = gpu_meta["removed_mask"][
-                        keep_indices
-                    ]  # Should be all False
-                    gpu_meta["last_occluded_tensor"] = gpu_meta["last_occluded_tensor"][
-                        keep_indices
-                    ]
+                    gpu_meta['obj_first_frame'] = gpu_meta['obj_first_frame'][keep_indices]
+                    gpu_meta['consecutive_unmatch_count'] = gpu_meta['consecutive_unmatch_count'][keep_indices]
+                    gpu_meta['trk_keep_alive'] = gpu_meta['trk_keep_alive'][keep_indices]
+                    gpu_meta['removed_mask'] = gpu_meta['removed_mask'][keep_indices]  # Should be all False
+                    gpu_meta['last_occluded_tensor'] = gpu_meta['last_occluded_tensor'][keep_indices]
 
                     # Compact pairwise matrix (remove both rows and columns)
-                    overlap_counts = gpu_meta["overlap_pair_counts"]
+                    overlap_counts = gpu_meta['overlap_pair_counts']
                     overlap_counts = overlap_counts[keep_indices][:, keep_indices]
-                    gpu_meta["overlap_pair_counts"] = overlap_counts
+                    gpu_meta['overlap_pair_counts'] = overlap_counts
 
                     # Update N_obj to reflect post-removal count
-                    gpu_meta["N_obj"] = keep_indices.size(0)
+                    gpu_meta['N_obj'] = keep_indices.size(0)
 
             # After compaction, extend gpu_metadata with new objects' initial values
             # This ensures obj_first_frame is set to the detection frame, not propagation frame
             num_new = len(new_det_obj_ids)
             if num_new > 0:
-                with torch.profiler.record_function(
-                    "extend_gpu_metadata_for_new_objects"
-                ):
-                    gpu_meta = tracker_metadata_new["gpu_metadata"]
+                with torch.profiler.record_function('extend_gpu_metadata_for_new_objects'):
+                    gpu_meta = tracker_metadata_new['gpu_metadata']
                     device = det_scores.device
                     NEVER_OCCLUDED = -1
 
                     # Extend all metadata tensors for new objects
-                    gpu_meta["obj_first_frame"] = torch.cat(
+                    gpu_meta['obj_first_frame'] = torch.cat(
                         [
                             gpu_meta.get(
-                                "obj_first_frame",
+                                'obj_first_frame',
                                 torch.empty(0, dtype=torch.long, device=device),
                             ),
-                            torch.full(
-                                (num_new,), frame_idx, dtype=torch.long, device=device
-                            ),
+                            torch.full((num_new,), frame_idx, dtype=torch.long, device=device),
                         ]
                     )
-                    gpu_meta["consecutive_unmatch_count"] = torch.cat(
+                    gpu_meta['consecutive_unmatch_count'] = torch.cat(
                         [
                             gpu_meta.get(
-                                "consecutive_unmatch_count",
+                                'consecutive_unmatch_count',
                                 torch.empty(0, dtype=torch.long, device=device),
                             ),
                             torch.zeros(num_new, dtype=torch.long, device=device),
                         ]
                     )
-                    gpu_meta["trk_keep_alive"] = torch.cat(
+                    gpu_meta['trk_keep_alive'] = torch.cat(
                         [
                             gpu_meta.get(
-                                "trk_keep_alive",
+                                'trk_keep_alive',
                                 torch.empty(0, dtype=torch.long, device=device),
                             ),
                             torch.full(
@@ -1367,19 +1232,19 @@ class Sam3MultiplexBase(Sam3VideoBase):
                             ),
                         ]
                     )
-                    gpu_meta["removed_mask"] = torch.cat(
+                    gpu_meta['removed_mask'] = torch.cat(
                         [
                             gpu_meta.get(
-                                "removed_mask",
+                                'removed_mask',
                                 torch.empty(0, dtype=torch.bool, device=device),
                             ),
                             torch.zeros(num_new, dtype=torch.bool, device=device),
                         ]
                     )
-                    gpu_meta["last_occluded_tensor"] = torch.cat(
+                    gpu_meta['last_occluded_tensor'] = torch.cat(
                         [
                             gpu_meta.get(
-                                "last_occluded_tensor",
+                                'last_occluded_tensor',
                                 torch.empty(0, dtype=torch.long, device=device),
                             ),
                             torch.full(
@@ -1392,31 +1257,29 @@ class Sam3MultiplexBase(Sam3VideoBase):
                     )
 
                     # Grow overlap matrix
-                    old_N = gpu_meta.get("N_obj", 0)
+                    old_N = gpu_meta.get('N_obj', 0)
                     new_N = old_N + num_new
                     old_overlap = gpu_meta.get(
-                        "overlap_pair_counts",
+                        'overlap_pair_counts',
                         torch.zeros((0, 0), dtype=torch.long, device=device),
                     )
-                    new_overlap = torch.zeros(
-                        (new_N, new_N), dtype=torch.long, device=device
-                    )
+                    new_overlap = torch.zeros((new_N, new_N), dtype=torch.long, device=device)
                     if old_N > 0:
                         new_overlap[:old_N, :old_N] = old_overlap
-                    gpu_meta["overlap_pair_counts"] = new_overlap
+                    gpu_meta['overlap_pair_counts'] = new_overlap
 
-                    gpu_meta["N_obj"] = new_N
+                    gpu_meta['N_obj'] = new_N
 
         sam2_update_plan = {
-            "new_det_fa_inds": adt_result.new_det_fa_inds,  # np.ndarray
-            "new_det_obj_ids": new_det_obj_ids,  # np.ndarray
-            "new_det_gpu_ids": new_det_gpu_ids,  # np.ndarray
-            "unmatched_trk_obj_ids": adt_result.unmatched_trk_obj_ids,  # np.ndarray
-            "det_to_matched_trk_obj_ids": adt_result.det_to_matched_trk_obj_ids,  # dict
-            "obj_ids_newly_removed": obj_ids_newly_removed,  # set
-            "num_obj_dropped_due_to_limit": num_obj_dropped_due_to_limit,  # int
-            "trk_id_to_max_iou_high_conf_det": adt_result.trk_id_to_max_iou_high_conf_det,  # dict
-            "reconditioned_obj_ids": reconditioned_obj_ids,  # set
+            'new_det_fa_inds': adt_result.new_det_fa_inds,  # np.ndarray
+            'new_det_obj_ids': new_det_obj_ids,  # np.ndarray
+            'new_det_gpu_ids': new_det_gpu_ids,  # np.ndarray
+            'unmatched_trk_obj_ids': adt_result.unmatched_trk_obj_ids,  # np.ndarray
+            'det_to_matched_trk_obj_ids': adt_result.det_to_matched_trk_obj_ids,  # dict
+            'obj_ids_newly_removed': obj_ids_newly_removed,  # set
+            'num_obj_dropped_due_to_limit': num_obj_dropped_due_to_limit,  # int
+            'trk_id_to_max_iou_high_conf_det': adt_result.trk_id_to_max_iou_high_conf_det,  # dict
+            'reconditioned_obj_ids': reconditioned_obj_ids,  # set
         }
         return sam2_update_plan, tracker_metadata_new
 
@@ -1444,21 +1307,21 @@ class Sam3MultiplexBase(Sam3VideoBase):
         """
         # NOTE: obj_ids_global is only used for debug logging, so we can use prev (it won't match perfectly but close enough for debugging)
         # The actual suppression logic uses GPU tensors which ARE in the correct index space from tracker_metadata_new
-        obj_ids_global = tracker_metadata_prev["obj_ids_all_gpu"]
+        obj_ids_global = tracker_metadata_prev['obj_ids_all_gpu']
         binary_tracker_low_res_masks_global = tracker_low_res_masks_global > 0
         batch_size = tracker_low_res_masks_global.size(0)
         num_ids = len(obj_ids_global)
 
         # immediately to force proper debugging. (Aligned with merge decision 4.5.2)
         assert batch_size == num_ids, (
-            f"Mask/metadata count mismatch in _suppress_overlapping: "
-            f"batch_size={batch_size}, num_ids={num_ids}, frame_idx={frame_idx}"
+            f'Mask/metadata count mismatch in _suppress_overlapping: '
+            f'batch_size={batch_size}, num_ids={num_ids}, frame_idx={frame_idx}'
         )
 
         binary_tracker_low_res_masks_global = tracker_low_res_masks_global > 0
         if batch_size > 0:
             assert len(obj_ids_global) == batch_size, (
-                f"Mismatch in number of objects: {len(obj_ids_global)} vs {batch_size}"
+                f'Mismatch in number of objects: {len(obj_ids_global)} vs {batch_size}'
             )
             NEVER_OCCLUDED = -1
             ALWAYS_OCCLUDED = 100000  # This value should be larger than any possible frame index, indicates that the object was removed by hotstart logic
@@ -1467,13 +1330,13 @@ class Sam3MultiplexBase(Sam3VideoBase):
             device = binary_tracker_low_res_masks_global.device
 
             # Get last_occluded from UPDATED gpu_metadata (already in correct index space from _process_hotstart_gpu)
-            gpu_metadata_new = tracker_metadata_new["gpu_metadata"]
-            last_occluded_prev = gpu_metadata_new["last_occluded_tensor"]
+            gpu_metadata_new = tracker_metadata_new['gpu_metadata']
+            last_occluded_prev = gpu_metadata_new['last_occluded_tensor']
 
             # Sanity check: ensure last_occluded_tensor is in sync with batch_size
             assert last_occluded_prev.size(0) == batch_size, (
-                f"last_occluded_tensor size mismatch: {last_occluded_prev.size(0)} vs {batch_size}. "
-                f"This indicates gpu_metadata tensors are out of sync."
+                f'last_occluded_tensor size mismatch: {last_occluded_prev.size(0)} vs {batch_size}. '
+                f'This indicates gpu_metadata tensors are out of sync.'
             )
 
             # Set ALWAYS_OCCLUDED for removed objects (fully vectorized, no sync!)
@@ -1498,15 +1361,11 @@ class Sam3MultiplexBase(Sam3VideoBase):
             last_occluded_new[is_obj_occluded_or_suppressed] = frame_idx
 
             # Store in gpu_metadata to keep it aligned with other metadata tensors
-            tracker_metadata_new["gpu_metadata"]["last_occluded_tensor"] = (
-                last_occluded_new
-            )
+            tracker_metadata_new['gpu_metadata']['last_occluded_tensor'] = last_occluded_new
 
             # Also maintain legacy dict format for backwards compatibility
             # This conversion happens on CPU AFTER memory encoding, not in critical path
-            tracker_metadata_new[
-                "obj_id_to_last_occluded"
-            ] = {}  # Will be populated later if needed
+            tracker_metadata_new['obj_id_to_last_occluded'] = {}  # Will be populated later if needed
 
             # Zero out suppressed masks before memory encoding
             NO_OBJ_LOGIT = -10
@@ -1518,17 +1377,15 @@ class Sam3MultiplexBase(Sam3VideoBase):
         """Extend planning metadata with multiplex-specific fields."""
         metadata = super()._create_planning_metadata(tracker_metadata_prev)
         if self.is_multiplex:
-            metadata["num_buc_per_gpu"] = self._deepcopy(
-                tracker_metadata_prev["num_buc_per_gpu"]
-            )
-        metadata["gpu_metadata"] = tracker_metadata_prev["gpu_metadata"]
+            metadata['num_buc_per_gpu'] = self._deepcopy(tracker_metadata_prev['num_buc_per_gpu'])
+        metadata['gpu_metadata'] = tracker_metadata_prev['gpu_metadata']
         return metadata
 
     def _post_execution_phase_hook(self, tracker_states_local, tracker_metadata_new):
         """Update bucket count after execution phase (multiplex-specific)."""
         if self.is_multiplex and tracker_metadata_new is not None:
             actual_bucket_count = self._count_buckets_in_states(tracker_states_local)
-            tracker_metadata_new["num_buc_per_gpu"][self.rank] = actual_bucket_count
+            tracker_metadata_new['num_buc_per_gpu'][self.rank] = actual_bucket_count
 
     def _count_buckets_in_states(self, tracker_states_local: List[Any]) -> int:
         """Count the total number of buckets across all states."""
@@ -1536,8 +1393,8 @@ class Sam3MultiplexBase(Sam3VideoBase):
             return 0
         total_buckets = 0
         for state in tracker_states_local:
-            if "multiplex_state" in state:
-                total_buckets += state["multiplex_state"].num_buckets
+            if 'multiplex_state' in state:
+                total_buckets += state['multiplex_state'].num_buckets
         return total_buckets
 
     # pyre-fixme[14]: `build_outputs` overrides method defined in `Sam3VideoBase`
@@ -1547,9 +1404,7 @@ class Sam3MultiplexBase(Sam3VideoBase):
         frame_idx: int,
         num_frames: int,
         reverse: bool,
-        det_out: Dict[
-            str, Tensor
-        ],  # TODO: Only det_out["mask"][new_det_fa_inds_local_t] is needed
+        det_out: Dict[str, Tensor],  # TODO: Only det_out["mask"][new_det_fa_inds_local_t] is needed
         tracker_low_res_masks_global: Tensor,
         tracker_obj_scores_global: Tensor,
         tracker_metadata_prev: Dict[str, np.ndarray],
@@ -1562,30 +1417,22 @@ class Sam3MultiplexBase(Sam3VideoBase):
         #  as `None`.
         det_to_matched_trk_obj_ids: dict = None,
     ):
-        new_det_fa_inds: np.ndarray = sam2_update_plan["new_det_fa_inds"]
-        new_det_obj_ids: np.ndarray = sam2_update_plan["new_det_obj_ids"]
+        new_det_fa_inds: np.ndarray = sam2_update_plan['new_det_fa_inds']
+        new_det_obj_ids: np.ndarray = sam2_update_plan['new_det_obj_ids']
         obj_id_to_mask = {}  # obj_id --> output mask tensor
 
         # Part 1: masks from previous SAM2 propagation
         # Align IDs and masks from previous SAM2 propagation
-        existing_masklet_obj_ids_all = tracker_metadata_prev["obj_ids_all_gpu"]
-        existing_masklet_obj_ids_per_gpu = np.concatenate(
-            tracker_metadata_prev["obj_ids_per_gpu"]
-        )
+        existing_masklet_obj_ids_all = tracker_metadata_prev['obj_ids_all_gpu']
+        existing_masklet_obj_ids_per_gpu = np.concatenate(tracker_metadata_prev['obj_ids_per_gpu'])
         use_per_gpu_ids = len(existing_masklet_obj_ids_per_gpu) != len(
             existing_masklet_obj_ids_all
-        ) or not np.array_equal(
-            existing_masklet_obj_ids_per_gpu, existing_masklet_obj_ids_all
-        )
-        existing_masklet_obj_ids = (
-            existing_masklet_obj_ids_per_gpu
-            if use_per_gpu_ids
-            else existing_masklet_obj_ids_all
-        )
+        ) or not np.array_equal(existing_masklet_obj_ids_per_gpu, existing_masklet_obj_ids_all)
+        existing_masklet_obj_ids = existing_masklet_obj_ids_per_gpu if use_per_gpu_ids else existing_masklet_obj_ids_all
         existing_masklet_video_res_masks = F.interpolate(
             tracker_low_res_masks_global.unsqueeze(1),
             size=(orig_vid_height, orig_vid_width),
-            mode="bilinear",
+            mode='bilinear',
             align_corners=False,
         )  # (num_obj, 1, H_video, W_video)
         # Pad/truncate masks to match metadata count
@@ -1596,20 +1443,16 @@ class Sam3MultiplexBase(Sam3VideoBase):
                 pad = existing_masklet_video_res_masks.new_zeros(
                     (num_ids - num_masks, 1, orig_vid_height, orig_vid_width)
                 )
-                existing_masklet_video_res_masks = torch.cat(
-                    [existing_masklet_video_res_masks, pad], dim=0
-                )
+                existing_masklet_video_res_masks = torch.cat([existing_masklet_video_res_masks, pad], dim=0)
             else:
-                existing_masklet_video_res_masks = existing_masklet_video_res_masks[
-                    :num_ids
-                ]
+                existing_masklet_video_res_masks = existing_masklet_video_res_masks[:num_ids]
         existing_masklet_binary = existing_masklet_video_res_masks > 0
         for obj_id, mask in zip(existing_masklet_obj_ids, existing_masklet_binary):
             obj_id_to_mask[obj_id] = mask  # (1, H_video, W_video)
 
         # Part 2: masks from new detections
         new_det_fa_inds_t = torch.from_numpy(new_det_fa_inds)
-        new_det_low_res_masks = det_out["mask"][new_det_fa_inds_t].unsqueeze(1)
+        new_det_low_res_masks = det_out['mask'][new_det_fa_inds_t].unsqueeze(1)
         new_det_low_res_masks = fill_holes_in_mask_scores(
             new_det_low_res_masks,
             fill_hole_area=self.fill_hole_area,
@@ -1620,7 +1463,7 @@ class Sam3MultiplexBase(Sam3VideoBase):
         new_masklet_video_res_masks = F.interpolate(
             new_det_low_res_masks,
             size=(orig_vid_height, orig_vid_width),
-            mode="bilinear",
+            mode='bilinear',
             align_corners=False,
         )  # (num_obj, 1, H_video, W_video)
 
@@ -1643,9 +1486,7 @@ class Sam3MultiplexBase(Sam3VideoBase):
         reverse: bool = False,
     ):
         # Suppress overlapping masks for objects that were most recently occluded
-        assert binary_low_res_masks.dtype == torch.bool, (
-            f"Expected boolean tensor, got {binary_low_res_masks.dtype}"
-        )
+        assert binary_low_res_masks.dtype == torch.bool, f'Expected boolean tensor, got {binary_low_res_masks.dtype}'
         to_suppress = torch.zeros(
             binary_low_res_masks.size(0),
             device=binary_low_res_masks.device,
@@ -1657,9 +1498,7 @@ class Sam3MultiplexBase(Sam3VideoBase):
         iou = mask_iou(binary_low_res_masks, binary_low_res_masks)  # [N,N]
 
         # Create masks for upper triangular matrix (i < j) and IoU threshold
-        mask_iou_thresh = (
-            iou >= self.suppress_overlapping_based_on_recent_occlusion_threshold
-        )
+        mask_iou_thresh = iou >= self.suppress_overlapping_based_on_recent_occlusion_threshold
         overlapping_pairs = torch.triu(mask_iou_thresh, diagonal=1)  # [N,N]
 
         last_occ_expanded_i = last_occluded.unsqueeze(1)  # (N, 1)
@@ -1668,20 +1507,14 @@ class Sam3MultiplexBase(Sam3VideoBase):
 
         if self.allow_unoccluded_to_suppress:
             # Suppress most recently occluded
-            suppress_i_mask = overlapping_pairs & cmp_op(
-                last_occ_expanded_i, last_occ_expanded_j
-            )
+            suppress_i_mask = overlapping_pairs & cmp_op(last_occ_expanded_i, last_occ_expanded_j)
 
-            suppress_j_mask = overlapping_pairs & cmp_op(
-                last_occ_expanded_j, last_occ_expanded_i
-            )
+            suppress_j_mask = overlapping_pairs & cmp_op(last_occ_expanded_j, last_occ_expanded_i)
         else:
             # Suppress most recently occluded
             suppress_i_mask = (
                 overlapping_pairs
-                & cmp_op(
-                    last_occ_expanded_i, last_occ_expanded_j
-                )  # (last_occ_expanded_i > last_occ_expanded_j)
+                & cmp_op(last_occ_expanded_i, last_occ_expanded_j)  # (last_occ_expanded_i > last_occ_expanded_j)
                 & (last_occ_expanded_j > -1)
                 # j can suppress i only if j was previously occluded
             )
@@ -1689,20 +1522,14 @@ class Sam3MultiplexBase(Sam3VideoBase):
             suppress_j_mask = (
                 overlapping_pairs
                 & cmp_op(last_occ_expanded_j, last_occ_expanded_i)
-                & (
-                    last_occ_expanded_i > -1
-                )  # i can suppress j only if i was previously occluded
+                & (last_occ_expanded_i > -1)  # i can suppress j only if i was previously occluded
             )
 
         # Apply suppression
         to_suppress = suppress_i_mask.any(dim=1) | suppress_j_mask.any(dim=0)
 
         # Log for debugging
-        if (
-            self.rank == 0
-            and logger.isEnabledFor(logging.DEBUG)
-            and frame_idx is not None
-        ):
+        if self.rank == 0 and logger.isEnabledFor(logging.DEBUG) and frame_idx is not None:
             suppress_i_mask = suppress_i_mask.cpu().numpy()
             suppress_j_mask = suppress_j_mask.cpu().numpy()
             # pyre-fixme[9]: last_occluded has type `Tensor`; used as `ndarray`.
@@ -1716,7 +1543,7 @@ class Sam3MultiplexBase(Sam3VideoBase):
                 for j in range(batch_size):
                     if suppress_i_mask[i, j]:
                         logger.debug(
-                            f"{frame_idx=}: Suppressing obj {obj_ids[i]} last occluded {last_occluded[i]} in favor of {obj_ids[j]} last occluded {last_occluded[j]}"
+                            f'{frame_idx=}: Suppressing obj {obj_ids[i]} last occluded {last_occluded[i]} in favor of {obj_ids[j]} last occluded {last_occluded[j]}'
                         )
 
             # Log j-suppression cases (where j gets suppressed in favor of i)
@@ -1724,7 +1551,7 @@ class Sam3MultiplexBase(Sam3VideoBase):
                 for j in range(batch_size):
                     if suppress_j_mask[i, j]:
                         logger.debug(
-                            f"{frame_idx=}: Suppressing obj {obj_ids[j]} last occluded {last_occluded[j]} in favor of {obj_ids[i]} last occluded {last_occluded[i]}"
+                            f'{frame_idx=}: Suppressing obj {obj_ids[j]} last occluded {last_occluded[j]} in favor of {obj_ids[i]} last occluded {last_occluded[i]}'
                         )
 
         return to_suppress
@@ -1746,12 +1573,12 @@ class Sam3MultiplexBase(Sam3VideoBase):
         low_res_masks_list = []
         obj_scores_list = []
         for inference_state in inference_states:
-            if len(inference_state["obj_ids"]) == 0:
+            if len(inference_state['obj_ids']) == 0:
                 continue  # skip propagation on empty inference states
 
             # propagate one frame
             num_frames_propagated = 0
-            with torch.profiler.record_function("sam2_predictor.propagate_in_video"):
+            with torch.profiler.record_function('sam2_predictor.propagate_in_video'):
                 # pyrefly: ignore [not-callable]
                 for out in self.tracker.propagate_in_video(
                     inference_state,
@@ -1765,16 +1592,14 @@ class Sam3MultiplexBase(Sam3VideoBase):
                 ):
                     # TODO we only need low-res outputs here for all-gather across GPUs,
                     # so we can remove the high-res interpolation in `propagate_in_video`
-                    out_frame_idx, out_obj_ids, out_low_res_masks, _, out_obj_scores = (
-                        out
-                    )
+                    out_frame_idx, out_obj_ids, out_low_res_masks, _, out_obj_scores = out
                     num_frames_propagated += 1
 
             # only 1 frames should be propagated
             # pyre-fixme[61]: `out_frame_idx` is undefined, or not always defined.
             assert num_frames_propagated == 1 and out_frame_idx == frame_idx, (
                 # pyre-fixme[61]: `out_frame_idx` is undefined, or not always defined.
-                f"num_frames_propagated: {num_frames_propagated}, out_frame_idx: {out_frame_idx}, frame_idx: {frame_idx}"
+                f'num_frames_propagated: {num_frames_propagated}, out_frame_idx: {out_frame_idx}, frame_idx: {frame_idx}'
             )
             # pyre-fixme[61]: `out_obj_ids` is undefined, or not always defined.
             assert isinstance(out_obj_ids, list)
@@ -1789,11 +1614,7 @@ class Sam3MultiplexBase(Sam3VideoBase):
                     max_score_rows = out_obj_scores.shape[0]
                     # Special case: common single-object refinement path where SAM2 returns a single mask row
                     # but a longer out_obj_ids list for the state. Treat the lone row as the requested object.
-                    if (
-                        len(filter_obj_ids) == 1
-                        and max_mask_rows == 1
-                        and max_score_rows == 1
-                    ):
+                    if len(filter_obj_ids) == 1 and max_mask_rows == 1 and max_score_rows == 1:
                         out_obj_ids = [filter_obj_ids[0]]
                         keep_indices = [0]
                     else:
@@ -1802,22 +1623,14 @@ class Sam3MultiplexBase(Sam3VideoBase):
                             # pyre-fixme[61]: `out_obj_ids` is undefined, or not
                             #  always defined.
                             for i, oid in enumerate(out_obj_ids)
-                            if oid in filter_obj_ids
-                            and i < max_mask_rows
-                            and i < max_score_rows
+                            if oid in filter_obj_ids and i < max_mask_rows and i < max_score_rows
                         ]
                 else:
                     keep_indices = []
                 if len(keep_indices) > 0:
-                    idx_tensor = torch.as_tensor(
-                        keep_indices, device=out_low_res_masks.device, dtype=torch.long
-                    )
-                    out_low_res_masks = out_low_res_masks.index_select(
-                        dim=0, index=idx_tensor
-                    )
-                    out_obj_scores = out_obj_scores.index_select(
-                        dim=0, index=idx_tensor
-                    )
+                    idx_tensor = torch.as_tensor(keep_indices, device=out_low_res_masks.device, dtype=torch.long)
+                    out_low_res_masks = out_low_res_masks.index_select(dim=0, index=idx_tensor)
+                    out_obj_scores = out_obj_scores.index_select(dim=0, index=idx_tensor)
                     out_obj_ids = [out_obj_ids[i] for i in keep_indices]
                 else:
                     # no selected objects in this local state; skip appending
@@ -1834,9 +1647,7 @@ class Sam3MultiplexBase(Sam3VideoBase):
 
         # concatenate the output masklets from all local inference states
 
-        with torch.profiler.record_function(
-            "sam2_predictor.propagate_in_video.fill_holes"
-        ):
+        with torch.profiler.record_function('sam2_predictor.propagate_in_video.fill_holes'):
             H_mask = W_mask = self.tracker.low_res_mask_size
             if len(low_res_masks_list) > 0:
                 low_res_masks_local = torch.cat(low_res_masks_list, dim=0)
@@ -1866,9 +1677,7 @@ class Sam3MultiplexBase(Sam3VideoBase):
             # in _tracker_update_memories
             if obj_ids_local != sorted(obj_ids_local):
                 # Get sorting permutation
-                sort_indices = sorted(
-                    range(len(obj_ids_local)), key=lambda i: obj_ids_local[i]
-                )
+                sort_indices = sorted(range(len(obj_ids_local)), key=lambda i: obj_ids_local[i])
                 # Apply permutation to reorder everything
                 obj_ids_local = [obj_ids_local[i] for i in sort_indices]
                 low_res_masks_local = low_res_masks_local[sort_indices]
@@ -1883,9 +1692,7 @@ class Sam3MultiplexBase(Sam3VideoBase):
             # in _tracker_update_memories
             if obj_ids_local != sorted(obj_ids_local):
                 # Get sorting permutation
-                sort_indices = sorted(
-                    range(len(obj_ids_local)), key=lambda i: obj_ids_local[i]
-                )
+                sort_indices = sorted(range(len(obj_ids_local)), key=lambda i: obj_ids_local[i])
                 # Apply permutation to reorder everything
                 obj_ids_local = [obj_ids_local[i] for i in sort_indices]
                 if low_res_masks_local.shape[0] == len(sort_indices):
@@ -1926,36 +1733,24 @@ class Sam3MultiplexBase(Sam3VideoBase):
 
         iou_threshold = self.assoc_iou_thresh
         iou_threshold_trk = self.trk_assoc_iou_thresh
-        new_det_thresh = (
-            self.new_det_thresh if default_det_thresh is None else default_det_thresh
-        )
+        new_det_thresh = self.new_det_thresh if default_det_thresh is None else default_det_thresh
 
-        assert det_masks.is_floating_point(), "float tensor expected (do not binarize)"
-        assert trk_masks.is_floating_point(), "float tensor expected (do not binarize)"
+        assert det_masks.is_floating_point(), 'float tensor expected (do not binarize)'
+        assert trk_masks.is_floating_point(), 'float tensor expected (do not binarize)'
         assert trk_masks.size(0) == len(trk_obj_ids), (
-            f"trk_masks and trk_obj_ids should have the same length, {trk_masks.size(0)} vs {len(trk_obj_ids)}"
+            f'trk_masks and trk_obj_ids should have the same length, {trk_masks.size(0)} vs {len(trk_obj_ids)}'
         )
         if trk_masks.size(0) == 0:
-            with torch.profiler.record_function("No tracklets"):
+            with torch.profiler.record_function('No tracklets'):
                 num_trk = 0
                 is_new_det = det_scores >= new_det_thresh
-                trk_is_unmatched = torch.zeros(
-                    num_trk, dtype=torch.bool, device=det_scores.device
-                )
-                trk_is_nonempty = torch.zeros(
-                    num_trk, dtype=torch.bool, device=det_scores.device
-                )
+                trk_is_unmatched = torch.zeros(num_trk, dtype=torch.bool, device=det_scores.device)
+                trk_is_nonempty = torch.zeros(num_trk, dtype=torch.bool, device=det_scores.device)
                 num_det = det_scores.shape[0]
-                det_to_max_iou_trk_idx = torch.full(
-                    (num_det,), -1, dtype=torch.long, device=det_scores.device
-                )
+                det_to_max_iou_trk_idx = torch.full((num_det,), -1, dtype=torch.long, device=det_scores.device)
                 det_is_high_conf = det_scores >= HIGH_CONF_THRESH
-                det_is_high_iou = torch.zeros(
-                    num_det, dtype=torch.bool, device=det_scores.device
-                )
-                im_mask = torch.zeros(
-                    num_det, num_trk, dtype=torch.bool, device=det_scores.device
-                )
+                det_is_high_iou = torch.zeros(num_det, dtype=torch.bool, device=det_scores.device)
+                im_mask = torch.zeros(num_det, num_trk, dtype=torch.bool, device=det_scores.device)
                 return LazyAssociateDetTrkResult(
                     trk_is_unmatched,
                     trk_is_nonempty,
@@ -1967,30 +1762,18 @@ class Sam3MultiplexBase(Sam3VideoBase):
                     im_mask,
                 )
         elif det_masks.size(0) == 0:
-            with torch.profiler.record_function("No detections"):
+            with torch.profiler.record_function('No detections'):
                 assert det_keep.size(0) == 0  # Make sure the keep mask agrees
                 trk_is_nonempty = (trk_masks > 0).any(dim=(1, 2))
                 num_det = 0
                 num_trk = trk_masks.shape[0]
-                trk_is_unmatched = torch.ones(
-                    num_trk, dtype=torch.bool, device=trk_masks.device
-                )
+                trk_is_unmatched = torch.ones(num_trk, dtype=torch.bool, device=trk_masks.device)
                 trk_is_nonempty_tensor = trk_is_nonempty.to(trk_masks.device)
-                is_new_det = torch.zeros(
-                    num_det, dtype=torch.bool, device=trk_masks.device
-                )
-                det_to_max_iou_trk_idx = torch.full(
-                    (num_det,), -1, dtype=torch.long, device=trk_masks.device
-                )
-                det_is_high_conf = torch.zeros(
-                    num_det, dtype=torch.bool, device=trk_masks.device
-                )
-                det_is_high_iou = torch.zeros(
-                    num_det, dtype=torch.bool, device=trk_masks.device
-                )
-                im_mask = torch.zeros(
-                    num_det, num_trk, dtype=torch.bool, device=trk_masks.device
-                )
+                is_new_det = torch.zeros(num_det, dtype=torch.bool, device=trk_masks.device)
+                det_to_max_iou_trk_idx = torch.full((num_det,), -1, dtype=torch.long, device=trk_masks.device)
+                det_is_high_conf = torch.zeros(num_det, dtype=torch.bool, device=trk_masks.device)
+                det_is_high_iou = torch.zeros(num_det, dtype=torch.bool, device=trk_masks.device)
+                im_mask = torch.zeros(num_det, num_trk, dtype=torch.bool, device=trk_masks.device)
                 return LazyAssociateDetTrkResult(
                     trk_is_unmatched,
                     trk_is_nonempty_tensor,
@@ -2008,7 +1791,7 @@ class Sam3MultiplexBase(Sam3VideoBase):
                 trk_masks = F.interpolate(
                     trk_masks.unsqueeze(1),
                     size=det_masks.shape[-2:],
-                    mode="bilinear",
+                    mode='bilinear',
                     align_corners=False,
                 ).squeeze(1)
             else:
@@ -2016,11 +1799,11 @@ class Sam3MultiplexBase(Sam3VideoBase):
                 det_masks = F.interpolate(
                     det_masks.unsqueeze(1),
                     size=trk_masks.shape[-2:],
-                    mode="bilinear",
+                    mode='bilinear',
                     align_corners=False,
                 ).squeeze(1)
 
-        with torch.profiler.record_function("associate_det_trk_compilable"):
+        with torch.profiler.record_function('associate_det_trk_compilable'):
             if trk_masks.shape[0] < self.max_num_objects:
                 padding_size = self.max_num_objects - trk_masks.shape[0]
                 trk_masks_padded = torch.cat(
@@ -2123,7 +1906,7 @@ class Sam3MultiplexBase(Sam3VideoBase):
             empty_mask = torch.zeros(0, dtype=torch.bool, device=self.device)
             # pyre-fixme[7]: Expected `Tuple[Tensor, Tensor, Dict[str, Tensor]]` but
             #  got `Tuple[Tensor, Tensor, Dict[str, int]]`.
-            return empty_mask, empty_mask, {"N_obj": 0}
+            return empty_mask, empty_mask, {'N_obj': 0}
 
         device = adt_result.trk_is_unmatched.device
         N_obj = adt_result.trk_is_unmatched.size(0)  # Number of current objects
@@ -2137,24 +1920,18 @@ class Sam3MultiplexBase(Sam3VideoBase):
 
         # Get previous frame's metadata (sized for previous N_obj)
         # NOTE: Metadata is already compacted from previous frame (removed objects are already filtered out)
-        prev_N_obj = gpu_metadata_prev.get("N_obj", 0)
+        prev_N_obj = gpu_metadata_prev.get('N_obj', 0)
 
         if prev_N_obj > 0:
             # Metadata from previous frame (position-indexed, already compacted)
-            obj_first_frame_prev = gpu_metadata_prev["obj_first_frame"]  # (prev_N_obj,)
-            consecutive_unmatch_count_prev = gpu_metadata_prev[
-                "consecutive_unmatch_count"
-            ]  # (prev_N_obj,)
-            trk_keep_alive_prev = gpu_metadata_prev["trk_keep_alive"]  # (prev_N_obj,)
+            obj_first_frame_prev = gpu_metadata_prev['obj_first_frame']  # (prev_N_obj,)
+            consecutive_unmatch_count_prev = gpu_metadata_prev['consecutive_unmatch_count']  # (prev_N_obj,)
+            trk_keep_alive_prev = gpu_metadata_prev['trk_keep_alive']  # (prev_N_obj,)
             removed_mask_prev = gpu_metadata_prev[
-                "removed_mask"
+                'removed_mask'
             ]  # (prev_N_obj,) - should be all False after compaction
-            overlap_pair_counts_prev = gpu_metadata_prev[
-                "overlap_pair_counts"
-            ]  # (prev_N_obj, prev_N_obj)
-            last_occluded_prev = gpu_metadata_prev[
-                "last_occluded_tensor"
-            ]  # (prev_N_obj,)
+            overlap_pair_counts_prev = gpu_metadata_prev['overlap_pair_counts']  # (prev_N_obj, prev_N_obj)
+            last_occluded_prev = gpu_metadata_prev['last_occluded_tensor']  # (prev_N_obj,)
         else:
             # First frame - no previous metadata
             obj_first_frame_prev = None
@@ -2173,7 +1950,7 @@ class Sam3MultiplexBase(Sam3VideoBase):
         # so prev_N_obj should already include objects detected on previous frame.
         # N_obj should equal prev_N_obj (no new objects mid-planning-phase).
         assert N_obj == prev_N_obj, (
-            f"N_obj ({N_obj}) should equal prev_N_obj ({prev_N_obj}); new objects handled after compaction"
+            f'N_obj ({N_obj}) should equal prev_N_obj ({prev_N_obj}); new objects handled after compaction'
         )
 
         # Carry forward existing metadata (or initialize if first frame)
@@ -2194,9 +1971,7 @@ class Sam3MultiplexBase(Sam3VideoBase):
             else torch.zeros(N_obj, dtype=torch.long, device=device)
         )
         removed_mask = (
-            removed_mask_prev
-            if removed_mask_prev is not None
-            else torch.zeros(N_obj, dtype=torch.bool, device=device)
+            removed_mask_prev if removed_mask_prev is not None else torch.zeros(N_obj, dtype=torch.bool, device=device)
         )
         overlap_pair_counts = (
             overlap_pair_counts_prev
@@ -2217,12 +1992,8 @@ class Sam3MultiplexBase(Sam3VideoBase):
         trk_is_matched = adt_result.im_mask.any(dim=0)  # (N_obj,)
 
         # Update: +1 for matched, -1 for unmatched, clamp to [min, max]
-        trk_keep_alive = torch.where(
-            trk_is_matched, trk_keep_alive + 1, trk_keep_alive - 1
-        )
-        trk_keep_alive = torch.clamp(
-            trk_keep_alive, min=self.min_trk_keep_alive, max=self.max_trk_keep_alive
-        )
+        trk_keep_alive = torch.where(trk_is_matched, trk_keep_alive + 1, trk_keep_alive - 1)
+        trk_keep_alive = torch.clamp(trk_keep_alive, min=self.min_trk_keep_alive, max=self.max_trk_keep_alive)
 
         # Also decrement for empty tracklets (if configured)
         if self.decrease_trk_keep_alive_for_empty_masklets:
@@ -2253,21 +2024,17 @@ class Sam3MultiplexBase(Sam3VideoBase):
         multi_match_mask = tracks_per_det > 1  # (N_det,)
 
         # Build overlap increment matrix using einsum
-        multi_match_tracks = adt_result.im_mask & multi_match_mask.unsqueeze(
-            1
-        )  # (N_det, N_obj)
+        multi_match_tracks = adt_result.im_mask & multi_match_mask.unsqueeze(1)  # (N_det, N_obj)
 
         # Compute pairwise overlaps: for each detection, outer product of matched tracks
         pairwise_overlap_this_frame = torch.einsum(
-            "di,dj->dij", multi_match_tracks.float(), multi_match_tracks.float()
+            'di,dj->dij', multi_match_tracks.float(), multi_match_tracks.float()
         )  # (N_det, N_obj, N_obj)
 
         # Sum across detections
         overlap_increment = pairwise_overlap_this_frame.sum(dim=0)  # (N_obj, N_obj)
         overlap_increment.fill_diagonal_(0)  # No self-overlap
-        overlap_increment = torch.triu(
-            overlap_increment, diagonal=1
-        )  # Upper triangle only
+        overlap_increment = torch.triu(overlap_increment, diagonal=1)  # Upper triangle only
 
         # Add this frame's increments (accumulate across frames, don't reset)
         # Original logic: overlap_pair_to_frame_inds[key].append(frame_idx) - never clears
@@ -2278,24 +2045,14 @@ class Sam3MultiplexBase(Sam3VideoBase):
         # ============================================================================
 
         # Hotstart boundary
-        hotstart_diff = (
-            frame_idx - self.hotstart_delay
-            if not reverse
-            else frame_idx + self.hotstart_delay
-        )
+        hotstart_diff = frame_idx - self.hotstart_delay if not reverse else frame_idx + self.hotstart_delay
 
         # Check if objects are within hotstart window
-        is_within_hotstart = (
-            (obj_first_frame > hotstart_diff)
-            if not reverse
-            else (obj_first_frame < hotstart_diff)
-        )
+        is_within_hotstart = (obj_first_frame > hotstart_diff) if not reverse else (obj_first_frame < hotstart_diff)
 
         # Remove if: within hotstart AND unmatched >= threshold AND not already removed
         remove_by_unmatch = (
-            is_within_hotstart
-            & (consecutive_unmatch_count >= self.hotstart_unmatch_thresh)
-            & ~removed_mask
+            is_within_hotstart & (consecutive_unmatch_count >= self.hotstart_unmatch_thresh) & ~removed_mask
         )
 
         # Suppress if: keep_alive <= 0 AND not hotstart-only mode AND not removed
@@ -2343,9 +2100,7 @@ class Sam3MultiplexBase(Sam3VideoBase):
 
             # Remove if: within hotstart AND overlapped with earlier >= threshold
             remove_by_overlap = (
-                is_within_hotstart
-                & (max_overlap_with_earlier >= self.hotstart_dup_thresh)
-                & ~removed_mask
+                is_within_hotstart & (max_overlap_with_earlier >= self.hotstart_dup_thresh) & ~removed_mask
             )
 
             to_remove = remove_by_unmatch | remove_by_overlap  # (N_obj,)
@@ -2360,13 +2115,13 @@ class Sam3MultiplexBase(Sam3VideoBase):
         # ============================================================================
 
         gpu_metadata_new = {
-            "N_obj": N_obj,
-            "obj_first_frame": obj_first_frame,
-            "consecutive_unmatch_count": consecutive_unmatch_count,
-            "trk_keep_alive": trk_keep_alive,
-            "removed_mask": removed_mask,
-            "overlap_pair_counts": overlap_pair_counts,
-            "last_occluded_tensor": last_occluded,
+            'N_obj': N_obj,
+            'obj_first_frame': obj_first_frame,
+            'consecutive_unmatch_count': consecutive_unmatch_count,
+            'trk_keep_alive': trk_keep_alive,
+            'removed_mask': removed_mask,
+            'overlap_pair_counts': overlap_pair_counts,
+            'last_occluded_tensor': last_occluded,
         }
 
         return to_remove, to_suppress, gpu_metadata_new
@@ -2385,22 +2140,18 @@ class Sam3MultiplexBase(Sam3VideoBase):
     ):
         """Handle hotstart heuristics to remove unmatched or duplicated objects."""
         # obj_id --> first frame index where the object was detected
-        obj_first_frame_idx = rank0_metadata["obj_first_frame_idx"]
+        obj_first_frame_idx = rank0_metadata['obj_first_frame_idx']
         # obj_id --> [mismatched frame indices]
-        unmatched_frame_inds = rank0_metadata["unmatched_frame_inds"]
-        trk_keep_alive = rank0_metadata["trk_keep_alive"]
+        unmatched_frame_inds = rank0_metadata['unmatched_frame_inds']
+        trk_keep_alive = rank0_metadata['trk_keep_alive']
         # (first_appear_obj_id, obj_id) --> [overlap frame indices]
-        overlap_pair_to_frame_inds = rank0_metadata["overlap_pair_to_frame_inds"]
+        overlap_pair_to_frame_inds = rank0_metadata['overlap_pair_to_frame_inds']
         # removed_obj_ids: object IDs that are suppressed via hot-start
-        removed_obj_ids = rank0_metadata["removed_obj_ids"]
-        suppressed_obj_ids = rank0_metadata["suppressed_obj_ids"][frame_idx]
+        removed_obj_ids = rank0_metadata['removed_obj_ids']
+        suppressed_obj_ids = rank0_metadata['suppressed_obj_ids'][frame_idx]
 
         obj_ids_newly_removed = set()  # object IDs to be newly removed on this frame
-        hotstart_diff = (
-            frame_idx - self.hotstart_delay
-            if not reverse
-            else frame_idx + self.hotstart_delay
-        )
+        hotstart_diff = frame_idx - self.hotstart_delay if not reverse else frame_idx + self.hotstart_delay
 
         # Step 1: log the frame index where each object ID first appears
         for obj_id in new_det_obj_ids:
@@ -2415,22 +2166,16 @@ class Sam3MultiplexBase(Sam3VideoBase):
             matched_trks.update(matched_trks_per_det)
         for obj_id in matched_trks:
             # NOTE: To minimize number of configurable params, we use the hotstart_unmatch_thresh to set the max value of trk_keep_alive
-            trk_keep_alive[obj_id] = min(
-                self.max_trk_keep_alive, trk_keep_alive[obj_id] + 1
-            )
+            trk_keep_alive[obj_id] = min(self.max_trk_keep_alive, trk_keep_alive[obj_id] + 1)
         for obj_id in unmatched_trk_obj_ids:
             unmatched_frame_inds[obj_id].append(frame_idx)
             # NOTE: To minimize number of configurable params, we use the hotstart_unmatch_thresh to set the min value of trk_keep_alive
             # The max keep alive is 2x the min, means the model prefers to keep the prediction rather than suppress it if it was matched long enough.
-            trk_keep_alive[obj_id] = max(
-                self.min_trk_keep_alive, trk_keep_alive[obj_id] - 1
-            )
+            trk_keep_alive[obj_id] = max(self.min_trk_keep_alive, trk_keep_alive[obj_id] - 1)
         if self.decrease_trk_keep_alive_for_empty_masklets:
             for obj_id in empty_trk_obj_ids:
                 # NOTE: To minimize number of configurable params, we use the hotstart_unmatch_thresh to set the min value of trk_keep_alive
-                trk_keep_alive[obj_id] = max(
-                    self.min_trk_keep_alive, trk_keep_alive[obj_id] - 1
-                )
+                trk_keep_alive[obj_id] = max(self.min_trk_keep_alive, trk_keep_alive[obj_id] - 1)
 
         # Step 2: removed tracks that has not matched with detections for `hotstart_unmatch_thresh` frames with hotstart period
         # a) add unmatched frame indices for each existing object ID
@@ -2442,14 +2187,14 @@ class Sam3MultiplexBase(Sam3VideoBase):
             if obj_id in removed_obj_ids or obj_id in obj_ids_newly_removed:
                 continue  # skip if the object is already removed
             if len(frame_indices) >= self.hotstart_unmatch_thresh:
-                is_within_hotstart = (
-                    obj_first_frame_idx[obj_id] > hotstart_diff and not reverse
-                ) or (obj_first_frame_idx[obj_id] < hotstart_diff and reverse)
+                is_within_hotstart = (obj_first_frame_idx[obj_id] > hotstart_diff and not reverse) or (
+                    obj_first_frame_idx[obj_id] < hotstart_diff and reverse
+                )
                 if is_within_hotstart:
                     obj_ids_newly_removed.add(obj_id)
                     logger.info(
-                        f"Removing object {obj_id} at frame {frame_idx} "
-                        f"since it is unmatched for frames: {frame_indices}"
+                        f'Removing object {obj_id} at frame {frame_idx} '
+                        f'since it is unmatched for frames: {frame_indices}'
                     )
             if (
                 trk_keep_alive[obj_id] <= 0  # Object has not been matched for too long
@@ -2457,9 +2202,7 @@ class Sam3MultiplexBase(Sam3VideoBase):
                 and obj_id not in removed_obj_ids
                 and obj_id not in obj_ids_newly_removed
             ):
-                logger.debug(
-                    f"Suppressing object {obj_id} at frame {frame_idx}, due to being unmatched"
-                )
+                logger.debug(f'Suppressing object {obj_id} at frame {frame_idx}, due to being unmatched')
                 suppressed_obj_ids.add(obj_id)
 
         # Step 3: removed tracks that overlaps with another track for `hotstart_dup_thresh` frames
@@ -2490,8 +2233,8 @@ class Sam3MultiplexBase(Sam3VideoBase):
                 if len(frame_indices) >= self.hotstart_dup_thresh:
                     obj_ids_newly_removed.add(obj_id)
                     logger.info(
-                        f"Removing object {obj_id} at frame {frame_idx} "
-                        f"since it overlaps with another track {first_obj_id} at frames: {frame_indices}"
+                        f'Removing object {obj_id} at frame {frame_idx} '
+                        f'since it overlaps with another track {first_obj_id} at frames: {frame_indices}'
                     )
 
         removed_obj_ids.update(obj_ids_newly_removed)
@@ -2521,22 +2264,16 @@ class Sam3MultiplexBase(Sam3VideoBase):
         high_res_masks = F.interpolate(
             low_res_masks.unsqueeze(1),
             size=(high_res_H, high_res_W),
-            mode="bilinear",
+            mode='bilinear',
             align_corners=False,
         )
         # We first apply non-overlapping constraints before memory encoding. This may include some suppression heuristics.
-        with torch.profiler.record_function(
-            "sam2_predictor.propagate_in_video.apply_non_overlapping_constraints"
-        ):
+        with torch.profiler.record_function('sam2_predictor.propagate_in_video.apply_non_overlapping_constraints'):
             # TODO: try _apply_object_wise_non_overlapping_constraints instead
             # pyrefly: ignore [not-callable]
-            high_res_masks = self.tracker._suppress_object_pw_area_shrinkage(
-                high_res_masks
-            )
+            high_res_masks = self.tracker._suppress_object_pw_area_shrinkage(high_res_masks)
         # Instead of gathering the predicted object scores, we use mask areas as a proxy.
-        object_score_logits = torch.where(
-            (high_res_masks > 0).any(dim=(-1, -2)), 10.0, -10.0
-        )
+        object_score_logits = torch.where((high_res_masks > 0).any(dim=(-1, -2)), 10.0, -10.0)
 
         if self.is_multiplex and self.tracker.is_multiplex_dynamic:
             # The objects in the masks are ordered w.r.t. object IDs,
@@ -2547,24 +2284,22 @@ class Sam3MultiplexBase(Sam3VideoBase):
             all_object_ids: list[int] = []
             object_id_to_state_i: dict[int, int] = {}
             for state_i, sam2_state in enumerate(sam2_inference_states):
-                obj_ids = sam2_state["obj_ids"]
+                obj_ids = sam2_state['obj_ids']
                 all_object_ids.extend(obj_ids)
                 for obj_id in obj_ids:
                     object_id_to_state_i[obj_id] = state_i
                 object_idx_assignment[state_i] = []
-            sorted_indices = sorted(
-                range(len(all_object_ids)), key=lambda i: all_object_ids[i]
-            )
+            sorted_indices = sorted(range(len(all_object_ids)), key=lambda i: all_object_ids[i])
             # Build the object_idx_assignment mapping
             for global_idx, local_idx in enumerate(sorted_indices):
                 obj_id = all_object_ids[local_idx]
                 object_idx_assignment[object_id_to_state_i[obj_id]].append(global_idx)
 
         # Run the memory encoder on local slices for each GPU
-        start_idx_gpu = sum(tracker_metadata["num_obj_per_gpu"][: self.rank])
+        start_idx_gpu = sum(tracker_metadata['num_obj_per_gpu'][: self.rank])
         start_idx_state = start_idx_gpu
         for state_i, sam2_state in enumerate(sam2_inference_states):
-            num_obj_per_state = len(sam2_state["obj_ids"])
+            num_obj_per_state = len(sam2_state['obj_ids'])
             if num_obj_per_state == 0:
                 continue
             # Get the local high-res masks and object score logits for this inference state
@@ -2581,9 +2316,7 @@ class Sam3MultiplexBase(Sam3VideoBase):
             else:
                 end_idx_state = start_idx_state + num_obj_per_state
                 local_high_res_masks = high_res_masks[start_idx_state:end_idx_state]
-                local_object_score_logits = object_score_logits[
-                    start_idx_state:end_idx_state
-                ]
+                local_object_score_logits = object_score_logits[start_idx_state:end_idx_state]
             local_batch_size = local_high_res_masks.size(0)
             # Run Sam2 memory encoder. Note that we do not re-enforce the non-overlapping constraint as it is turned off by default
 
@@ -2607,23 +2340,19 @@ class Sam3MultiplexBase(Sam3VideoBase):
                 local_maskmem_features, local_maskmem_pos_enc = encoded_mem
 
             # Store encoded memories in the local inference state
-            output_dict = sam2_state["output_dict"]
-            for storage_key in ["cond_frame_outputs", "non_cond_frame_outputs"]:
+            output_dict = sam2_state['output_dict']
+            for storage_key in ['cond_frame_outputs', 'non_cond_frame_outputs']:
                 if frame_idx not in output_dict[storage_key]:
                     continue
-                output_dict[storage_key][frame_idx]["maskmem_features"] = (
-                    local_maskmem_features
-                )
-                output_dict[storage_key][frame_idx]["maskmem_pos_enc"] = [
-                    pos for pos in local_maskmem_pos_enc
-                ]
+                output_dict[storage_key][frame_idx]['maskmem_features'] = local_maskmem_features
+                output_dict[storage_key][frame_idx]['maskmem_pos_enc'] = [pos for pos in local_maskmem_pos_enc]
                 if self.is_multiplex:
-                    output_dict[storage_key][frame_idx]["image_features"] = (
+                    output_dict[storage_key][frame_idx]['image_features'] = (
                         # pyre-fixme[61]: `local_image_features` is undefined, or
                         #  not always defined.
                         local_image_features
                     )
-                    output_dict[storage_key][frame_idx]["image_pos_enc"] = (
+                    output_dict[storage_key][frame_idx]['image_pos_enc'] = (
                         # pyre-fixme[61]: `local_image_pos_enc` is undefined, or not
                         #  always defined.
                         local_image_pos_enc
@@ -2632,15 +2361,13 @@ class Sam3MultiplexBase(Sam3VideoBase):
                     if self.reapply_no_object_pointer:
                         # reapply the no_object_pointer projection for the objects suppressed by the heuristics
                         newly_suppressed_objects = (
-                            output_dict[storage_key][frame_idx]["object_score_logits"]
+                            output_dict[storage_key][frame_idx]['object_score_logits']
                             > self.tracker.object_score_logit_threshold
                         ) & (local_object_score_logits < 0)
                         if torch.any(newly_suppressed_objects):
-                            existing_pointers = output_dict[storage_key][frame_idx][
-                                "obj_ptr"
-                            ]
+                            existing_pointers = output_dict[storage_key][frame_idx]['obj_ptr']
 
-                            multiplex_state = sam2_state["multiplex_state"]
+                            multiplex_state = sam2_state['multiplex_state']
                             existing_pointers = multiplex_state.demux(existing_pointers)
 
                             newly_suppressed_objects = newly_suppressed_objects.float()
@@ -2652,13 +2379,9 @@ class Sam3MultiplexBase(Sam3VideoBase):
                                 + (1 - newly_suppressed_objects) * existing_pointers
                             )
 
-                            output_dict[storage_key][frame_idx]["obj_ptr"] = (
-                                multiplex_state.mux(new_pointers)
-                            )
+                            output_dict[storage_key][frame_idx]['obj_ptr'] = multiplex_state.mux(new_pointers)
                 elif self.reapply_no_object_pointer:
-                    raise NotImplementedError(
-                        "reapply_no_object_pointer is not implemented for non-multiplex"
-                    )
+                    raise NotImplementedError('reapply_no_object_pointer is not implemented for non-multiplex')
 
                 # for batched inference state, we also need to add per-object
                 # memory slides to support instance interactivity
@@ -2684,9 +2407,7 @@ class Sam3MultiplexBase(Sam3VideoBase):
     ):
         """Add new objects to SAM2 inference states."""
 
-        prev_sam2_state = (
-            tracker_states_local[0] if len(tracker_states_local) > 0 else None
-        )
+        prev_sam2_state = tracker_states_local[0] if len(tracker_states_local) > 0 else None
         # prepare inference_state
         if self.tracker.is_multiplex_dynamic:
             # in multiplex_dynamic mode, we first try to find the best-fit
@@ -2696,15 +2417,12 @@ class Sam3MultiplexBase(Sam3VideoBase):
 
             # Try to find existing states with available slots
             best_state = None
-            best_available_slots = float("inf")
+            best_available_slots = float('inf')
 
             for state in tracker_states_local:
-                available_slots = state["multiplex_state"].available_slots
+                available_slots = state['multiplex_state'].available_slots
                 # Find the state with the least available slots that can still fit the new objects
-                if (
-                    available_slots >= num_new_objects
-                    and available_slots < best_available_slots
-                ):
+                if available_slots >= num_new_objects and available_slots < best_available_slots:
                     best_state = state
                     best_available_slots = available_slots
 
@@ -2720,10 +2438,8 @@ class Sam3MultiplexBase(Sam3VideoBase):
                     video_width=orig_vid_width,
                     num_frames=num_frames,
                 )
-                new_sam2_state["backbone_out"] = (
-                    prev_sam2_state.get("backbone_out", None)
-                    if prev_sam2_state is not None
-                    else None
+                new_sam2_state['backbone_out'] = (
+                    prev_sam2_state.get('backbone_out', None) if prev_sam2_state is not None else None
                 )
                 # Add the new state to our local states list
                 tracker_states_local.append(new_sam2_state)
@@ -2741,7 +2457,7 @@ class Sam3MultiplexBase(Sam3VideoBase):
                         video_width=orig_vid_width,
                         num_frames=num_frames,
                     )
-                    new_sam2_state["backbone_out"] = None
+                    new_sam2_state['backbone_out'] = None
                     tracker_states_local = [new_sam2_state]
             else:
                 # batch objects that first appear on the same frame together
@@ -2753,10 +2469,8 @@ class Sam3MultiplexBase(Sam3VideoBase):
                     video_width=orig_vid_width,
                     num_frames=num_frames,
                 )
-                new_sam2_state["backbone_out"] = (
-                    prev_sam2_state.get("backbone_out", None)
-                    if prev_sam2_state is not None
-                    else None
+                new_sam2_state['backbone_out'] = (
+                    prev_sam2_state.get('backbone_out', None) if prev_sam2_state is not None else None
                 )
                 tracker_states_local.append(new_sam2_state)
 
@@ -2769,7 +2483,7 @@ class Sam3MultiplexBase(Sam3VideoBase):
             new_obj_masks.unsqueeze(1),
             # pyrefly: ignore [bad-argument-type]
             size=(input_mask_res, input_mask_res),
-            mode="bilinear",
+            mode='bilinear',
             align_corners=False,
         ).squeeze(1)
         new_obj_masks = new_obj_masks > 0
@@ -2803,9 +2517,7 @@ class Sam3MultiplexBase(Sam3VideoBase):
 
         return tracker_states_local
 
-    def _tracker_remove_objects(
-        self, tracker_states_local: List[Any], obj_ids: list[int]
-    ):
+    def _tracker_remove_objects(self, tracker_states_local: List[Any], obj_ids: list[int]):
         """
         Remove an object from SAM2 inference states. This would remove the object from
         all frames in the video.
@@ -2838,9 +2550,9 @@ class Sam3MultiplexBase(Sam3VideoBase):
         """
         Update masklet confirmation status.
         """
-        confirmation_data = rank0_metadata["masklet_confirmation"]
-        status_prev = confirmation_data["status"]
-        consecutive_det_num_prev = confirmation_data["consecutive_det_num"]
+        confirmation_data = rank0_metadata['masklet_confirmation']
+        status_prev = confirmation_data['status']
+        consecutive_det_num_prev = confirmation_data['consecutive_det_num']
 
         N_prev = len(obj_ids_all_gpu_prev)
         N_updated = len(obj_ids_all_gpu_updated)
@@ -2853,9 +2565,7 @@ class Sam3MultiplexBase(Sam3VideoBase):
 
         if N_prev > 0 and N_updated > 0:
             # Build mapping: obj_id -> new index
-            obj_id_to_new_idx = {
-                obj_id: idx for idx, obj_id in enumerate(obj_ids_all_gpu_updated)
-            }
+            obj_id_to_new_idx = {obj_id: idx for idx, obj_id in enumerate(obj_ids_all_gpu_updated)}
 
             # Copy previous values for objects that still exist
             for old_idx, obj_id in enumerate(obj_ids_all_gpu_prev):
@@ -2878,15 +2588,12 @@ class Sam3MultiplexBase(Sam3VideoBase):
                 consecutive_det_num[idx] = 0
 
             # Update status to CONFIRMED where threshold is met
-            if (
-                consecutive_det_num[idx]
-                >= self.masklet_confirmation_consecutive_det_thresh
-            ):
+            if consecutive_det_num[idx] >= self.masklet_confirmation_consecutive_det_thresh:
                 status[idx] = MaskletConfirmationStatus.CONFIRMED.value
 
         # Store updated arrays
-        confirmation_data["status"] = status
-        confirmation_data["consecutive_det_num"] = consecutive_det_num
+        confirmation_data['status'] = status
+        confirmation_data['consecutive_det_num'] = consecutive_det_num
         return rank0_metadata
 
 
@@ -2941,5 +2648,5 @@ class Sam3MultiplexPredictorWrapper(Sam3MultiplexTrackerPredictor):
         self.is_multiplex_dynamic = is_multiplex_dynamic
 
         # use bfloat16 inference for Flash Attention kernel
-        self.bf16_context = torch.autocast(device_type="cuda", dtype=torch.bfloat16)
+        self.bf16_context = torch.autocast(device_type='cuda', dtype=torch.bfloat16)
         self.bf16_context.__enter__()

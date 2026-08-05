@@ -5,10 +5,8 @@
 import torch
 
 
-@torch.library.custom_op("flash::flash_attn_func", mutates_args=())
-def flash_attn_func_op(
-    q: torch.Tensor, k: torch.Tensor, v: torch.Tensor
-) -> torch.Tensor:
+@torch.library.custom_op('flash::flash_attn_func', mutates_args=())
+def flash_attn_func_op(q: torch.Tensor, k: torch.Tensor, v: torch.Tensor) -> torch.Tensor:
     # pyrefly: ignore [missing-import]
     from flash_attn_interface import flash_attn_func as fa3
 

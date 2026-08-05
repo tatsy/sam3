@@ -69,7 +69,7 @@ class SimpleMaskDownSampler(nn.Module):
         self.interpol_size = interpol_size
         if self.interpol_size is not None:
             assert isinstance(self.interpol_size, (list, tuple)), (
-                f"Unsupported type {type(self.interpol_size)}. Should be a list or tuple."
+                f'Unsupported type {type(self.interpol_size)}. Should be a list or tuple.'
             )
             # pyrefly: ignore [bad-argument-type]
             self.interpol_size = list(interpol_size)
@@ -81,7 +81,7 @@ class SimpleMaskDownSampler(nn.Module):
                 x.float(),
                 size=self.interpol_size,
                 align_corners=False,
-                mode="bilinear",
+                mode='bilinear',
                 antialias=True,
             )
         return self.encoder(x)
@@ -118,9 +118,7 @@ class CXBlock(nn.Module):
             groups=dim if use_dwconv else 1,
         )  # depthwise conv
         self.norm = LayerNorm2d(dim, eps=1e-6)
-        self.pwconv1 = nn.Linear(
-            dim, 4 * dim
-        )  # pointwise/1x1 convs, implemented with linear layers
+        self.pwconv1 = nn.Linear(dim, 4 * dim)  # pointwise/1x1 convs, implemented with linear layers
         self.act = nn.GELU()
         self.pwconv2 = nn.Linear(4 * dim, dim)
         self.gamma = (
@@ -208,4 +206,4 @@ class SimpleMaskEncoder(nn.Module):
         pos = self.position_encoding(x).to(x.dtype)
 
         # pyrefly: ignore [bad-return]
-        return {"vision_features": x, "vision_pos_enc": [pos]}
+        return {'vision_features': x, 'vision_pos_enc': [pos]}

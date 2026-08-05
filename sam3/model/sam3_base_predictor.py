@@ -49,70 +49,68 @@ class Sam3BasePredictor:
     @torch.inference_mode()
     def handle_request(self, request):
         """Dispatch a request based on its type."""
-        request_type = request["type"]
-        if request_type == "start_session":
+        request_type = request['type']
+        if request_type == 'start_session':
             return self.start_session(
-                resource_path=request["resource_path"],
-                session_id=request.get("session_id", None),
-                offload_video_to_cpu=request.get("offload_video_to_cpu", False),
-                offload_state_to_cpu=request.get("offload_state_to_cpu", False),
+                resource_path=request['resource_path'],
+                session_id=request.get('session_id', None),
+                offload_video_to_cpu=request.get('offload_video_to_cpu', False),
+                offload_state_to_cpu=request.get('offload_state_to_cpu', False),
             )
-        elif request_type == "add_prompt":
+        elif request_type == 'add_prompt':
             return self.add_prompt(
-                session_id=request["session_id"],
-                frame_idx=request["frame_index"],
-                text=request.get("text", None),
-                points=request.get("points", None),
-                point_labels=request.get("point_labels", None),
-                clear_old_points=request.get("clear_old_points", True),
-                bounding_boxes=request.get("bounding_boxes", None),
-                bounding_box_labels=request.get("bounding_box_labels", None),
-                clear_old_boxes=request.get("clear_old_boxes", True),
+                session_id=request['session_id'],
+                frame_idx=request['frame_index'],
+                text=request.get('text', None),
+                points=request.get('points', None),
+                point_labels=request.get('point_labels', None),
+                clear_old_points=request.get('clear_old_points', True),
+                bounding_boxes=request.get('bounding_boxes', None),
+                bounding_box_labels=request.get('bounding_box_labels', None),
+                clear_old_boxes=request.get('clear_old_boxes', True),
                 output_prob_thresh=request.get(
-                    "output_prob_thresh",
-                    getattr(self, "default_output_prob_thresh", 0.5),
+                    'output_prob_thresh',
+                    getattr(self, 'default_output_prob_thresh', 0.5),
                 ),
-                obj_id=request.get("obj_id", None),
-                rel_coordinates=request.get("rel_coordinates", True),
+                obj_id=request.get('obj_id', None),
+                rel_coordinates=request.get('rel_coordinates', True),
             )
-        elif request_type == "remove_object":
+        elif request_type == 'remove_object':
             return self.remove_object(
-                session_id=request["session_id"],
-                frame_idx=request.get("frame_index", 0),
-                obj_id=request["obj_id"],
+                session_id=request['session_id'],
+                frame_idx=request.get('frame_index', 0),
+                obj_id=request['obj_id'],
             )
-        elif request_type == "reset_session":
-            return self.reset_session(session_id=request["session_id"])
-        elif request_type == "cancel_propagation":
-            return self.cancel_propagation(session_id=request["session_id"])
-        elif request_type == "close_session":
+        elif request_type == 'reset_session':
+            return self.reset_session(session_id=request['session_id'])
+        elif request_type == 'cancel_propagation':
+            return self.cancel_propagation(session_id=request['session_id'])
+        elif request_type == 'close_session':
             return self.close_session(
-                session_id=request["session_id"],
-                run_gc_collect=request.get("run_gc_collect", True),
-                clear_cache_threshold=int(
-                    request.get("clear_cache_threshold", _CLEAR_CACHE_THRESHOLD)
-                ),
+                session_id=request['session_id'],
+                run_gc_collect=request.get('run_gc_collect', True),
+                clear_cache_threshold=int(request.get('clear_cache_threshold', _CLEAR_CACHE_THRESHOLD)),
             )
         else:
-            raise RuntimeError(f"invalid request type: {request_type}")
+            raise RuntimeError(f'invalid request type: {request_type}')
 
     @torch.inference_mode()
     def handle_stream_request(self, request):
         """Dispatch a stream request based on its type."""
-        request_type = request["type"]
-        if request_type == "propagate_in_video":
+        request_type = request['type']
+        if request_type == 'propagate_in_video':
             yield from self.propagate_in_video(
-                session_id=request["session_id"],
-                propagation_direction=request.get("propagation_direction", "both"),
-                start_frame_idx=request.get("start_frame_index", None),
-                max_frame_num_to_track=request.get("max_frame_num_to_track", None),
+                session_id=request['session_id'],
+                propagation_direction=request.get('propagation_direction', 'both'),
+                start_frame_idx=request.get('start_frame_index', None),
+                max_frame_num_to_track=request.get('max_frame_num_to_track', None),
                 output_prob_thresh=request.get(
-                    "output_prob_thresh",
-                    getattr(self, "default_output_prob_thresh", 0.5),
+                    'output_prob_thresh',
+                    getattr(self, 'default_output_prob_thresh', 0.5),
                 ),
             )
         else:
-            raise RuntimeError(f"invalid request type: {request_type}")
+            raise RuntimeError(f'invalid request type: {request_type}')
 
     # ── Session management ────────────────────────────────────────────
 
@@ -129,22 +127,22 @@ class Sam3BasePredictor:
             offload_video_to_cpu=offload_video_to_cpu,
             offload_state_to_cpu=offload_state_to_cpu,
         )
-        if hasattr(self, "async_loading_frames"):
-            init_kwargs["async_loading_frames"] = self.async_loading_frames
-        if hasattr(self, "video_loader_type"):
-            init_kwargs["video_loader_type"] = self.video_loader_type
+        if hasattr(self, 'async_loading_frames'):
+            init_kwargs['async_loading_frames'] = self.async_loading_frames
+        if hasattr(self, 'video_loader_type'):
+            init_kwargs['video_loader_type'] = self.video_loader_type
         inference_state = self.model.init_state(**init_kwargs)
 
         if not session_id:
             session_id = str(uuid.uuid4())
         self._all_inference_states[session_id] = {
-            "state": inference_state,
-            "session_id": session_id,
-            "start_time": time.time(),
-            "last_use_time": time.time(),
+            'state': inference_state,
+            'session_id': session_id,
+            'start_time': time.time(),
+            'last_use_time': time.time(),
         }
-        logger.info(f"started new session {session_id}")
-        return {"session_id": session_id}
+        logger.info(f'started new session {session_id}')
+        return {'session_id': session_id}
 
     def add_prompt(
         self,
@@ -163,7 +161,7 @@ class Sam3BasePredictor:
     ):
         """Add text, box and/or point prompt on a specific video frame."""
         session = self._get_session(session_id)
-        inference_state = session["state"]
+        inference_state = session['state']
         self._extend_expiration_time(session)
 
         # Convert lists to tensors if needed
@@ -173,9 +171,7 @@ class Sam3BasePredictor:
             point_labels = torch.tensor(point_labels, dtype=torch.int32)
         if bounding_boxes is not None and not isinstance(bounding_boxes, torch.Tensor):
             bounding_boxes = torch.tensor(bounding_boxes, dtype=torch.float32)
-        if bounding_box_labels is not None and not isinstance(
-            bounding_box_labels, torch.Tensor
-        ):
+        if bounding_box_labels is not None and not isinstance(bounding_box_labels, torch.Tensor):
             bounding_box_labels = torch.tensor(bounding_box_labels, dtype=torch.int32)
 
         kwargs = dict(
@@ -192,7 +188,7 @@ class Sam3BasePredictor:
             rel_coordinates=rel_coordinates,
         )
         if obj_id is not None:
-            kwargs["obj_id"] = obj_id
+            kwargs['obj_id'] = obj_id
 
         # Filter kwargs to only pass what the model accepts
         # (SAM3 has a simpler add_prompt than SAM3.1)
@@ -202,9 +198,9 @@ class Sam3BasePredictor:
         valid_params = set(sig.parameters.keys())
         filtered_kwargs = {k: v for k, v in kwargs.items() if k in valid_params}
 
-        with torch.autocast(device_type="cuda", dtype=torch.bfloat16):
+        with torch.autocast(device_type='cuda', dtype=torch.bfloat16):
             frame_idx, outputs = self.model.add_prompt(**filtered_kwargs)
-        return {"frame_index": frame_idx, "outputs": outputs}
+        return {'frame_index': frame_idx, 'outputs': outputs}
 
     def remove_object(
         self,
@@ -215,12 +211,10 @@ class Sam3BasePredictor:
     ):
         """Remove an object from tracking."""
         session = self._get_session(session_id)
-        inference_state = session["state"]
+        inference_state = session['state']
         self._extend_expiration_time(session)
 
-        result = self.model.remove_object(
-            inference_state, obj_id, frame_idx=frame_idx, is_user_action=is_user_action
-        )
+        result = self.model.remove_object(inference_state, obj_id, frame_idx=frame_idx, is_user_action=is_user_action)
         # Handle both return conventions
         if result is None or (isinstance(result, tuple) and result[1] is None):
             import numpy as np
@@ -228,35 +222,35 @@ class Sam3BasePredictor:
             out_obj_ids = torch.zeros(0, dtype=torch.int64)
             out_binary_masks = torch.zeros(
                 0,
-                inference_state["orig_height"],
-                inference_state["orig_width"],
+                inference_state['orig_height'],
+                inference_state['orig_width'],
                 dtype=torch.bool,
             )
             out_boxes_xywh = torch.zeros(0, 4, dtype=torch.float32)
             outputs = {
-                "out_obj_ids": out_obj_ids.cpu().numpy(),
-                "out_boxes_xywh": out_boxes_xywh.cpu().numpy(),
-                "out_binary_masks": out_binary_masks.cpu().numpy(),
+                'out_obj_ids': out_obj_ids.cpu().numpy(),
+                'out_boxes_xywh': out_boxes_xywh.cpu().numpy(),
+                'out_binary_masks': out_binary_masks.cpu().numpy(),
             }
         elif isinstance(result, tuple):
             _, outputs = result
         else:
             outputs = result
-        return {"frame_index": frame_idx, "outputs": outputs}
+        return {'frame_index': frame_idx, 'outputs': outputs}
 
     def cancel_propagation(self, session_id):
         """Cancel any ongoing propagation. No-op if not supported by the model."""
         session = self._get_session(session_id)
-        inference_state = session["state"]
+        inference_state = session['state']
         self._extend_expiration_time(session)
-        if hasattr(self.model, "cancel_propagation"):
+        if hasattr(self.model, 'cancel_propagation'):
             self.model.cancel_propagation(inference_state)
-        return {"is_success": True}
+        return {'is_success': True}
 
     def propagate_in_video(
         self,
         session_id,
-        propagation_direction="both",
+        propagation_direction='both',
         start_frame_idx=None,
         max_frame_num_to_track=None,
         output_prob_thresh=0.5,
@@ -265,12 +259,10 @@ class Sam3BasePredictor:
         """Propagate the added prompts to get results on all video frames."""
         try:
             session = self._get_session(session_id)
-            inference_state = session["state"]
+            inference_state = session['state']
             self._extend_expiration_time(session)
-            if propagation_direction not in ["both", "forward", "backward"]:
-                raise ValueError(
-                    f"invalid propagation direction: {propagation_direction}"
-                )
+            if propagation_direction not in ['both', 'forward', 'backward']:
+                raise ValueError(f'invalid propagation direction: {propagation_direction}')
 
             propagate_kwargs = dict(
                 inference_state=inference_state,
@@ -281,36 +273,36 @@ class Sam3BasePredictor:
             import inspect
 
             sig = inspect.signature(self.model.propagate_in_video)
-            if "output_prob_thresh" in sig.parameters:
-                propagate_kwargs["output_prob_thresh"] = output_prob_thresh
+            if 'output_prob_thresh' in sig.parameters:
+                propagate_kwargs['output_prob_thresh'] = output_prob_thresh
             for k, v in kwargs.items():
                 if k in sig.parameters:
                     propagate_kwargs[k] = v
 
             # Forward propagation
-            if propagation_direction in ["both", "forward"]:
+            if propagation_direction in ['both', 'forward']:
                 for frame_idx, outputs in self.model.propagate_in_video(
                     **propagate_kwargs,
                     reverse=False,
                 ):
-                    yield {"frame_index": frame_idx, "outputs": outputs}
+                    yield {'frame_index': frame_idx, 'outputs': outputs}
             # Backward propagation
-            if propagation_direction in ["both", "backward"]:
+            if propagation_direction in ['both', 'backward']:
                 for frame_idx, outputs in self.model.propagate_in_video(
                     **propagate_kwargs,
                     reverse=True,
                 ):
-                    yield {"frame_index": frame_idx, "outputs": outputs}
+                    yield {'frame_index': frame_idx, 'outputs': outputs}
         finally:
-            logger.info(f"propagation ended in session {session_id}")
+            logger.info(f'propagation ended in session {session_id}')
 
     def reset_session(self, session_id):
         """Reset the session to its initial state."""
         session = self._get_session(session_id)
-        inference_state = session["state"]
+        inference_state = session['state']
         self._extend_expiration_time(session)
         self.model.reset_state(inference_state)
-        return {"is_success": True}
+        return {'is_success': True}
 
     def close_session(
         self,
@@ -343,9 +335,9 @@ class Sam3BasePredictor:
         unchanged — additional dict keys are ignored at the JSON layer.
         """
         session = self._all_inference_states.pop(session_id, None)
-        result = {"is_success": True}
+        result = {'is_success': True}
         if session is None:
-            logger.warning(f"cannot close session {session_id} as it does not exist")
+            logger.warning(f'cannot close session {session_id} as it does not exist')
         else:
             # Explicitly clear the per-session dicts BEFORE ``del session``.
             #
@@ -380,7 +372,7 @@ class Sam3BasePredictor:
             # container) is still holding the wrapper dict alive via a
             # cycle. Lists in the inference state hold ``None``s for
             # per-frame slots, so they don't need separate handling.
-            state = session.get("state")
+            state = session.get('state')
             if isinstance(state, dict):
                 state.clear()
             session.clear()
@@ -390,23 +382,23 @@ class Sam3BasePredictor:
                 gpu_mem = self._gpu_mem_snapshot()
                 if (
                     torch.cuda.is_available()
-                    and gpu_mem["total_bytes"] > 0
-                    and (100.0 - gpu_mem["free_pct"]) >= clear_cache_threshold
+                    and gpu_mem['total_bytes'] > 0
+                    and (100.0 - gpu_mem['free_pct']) >= clear_cache_threshold
                 ):
                     torch.cuda.empty_cache()
                     post_gpu_mem = self._gpu_mem_snapshot()
                     logger.info(
-                        f"empty_cache freed "
-                        f"{post_gpu_mem['free_bytes'] - gpu_mem['free_bytes']} bytes "
-                        f"(free_pct {gpu_mem['free_pct']:.1f}% -> "
-                        f"{post_gpu_mem['free_pct']:.1f}%, reserved "
-                        f"{gpu_mem['reserved_bytes']} -> "
-                        f"{post_gpu_mem['reserved_bytes']} bytes)"
+                        f'empty_cache freed '
+                        f'{post_gpu_mem["free_bytes"] - gpu_mem["free_bytes"]} bytes '
+                        f'(free_pct {gpu_mem["free_pct"]:.1f}% -> '
+                        f'{post_gpu_mem["free_pct"]:.1f}%, reserved '
+                        f'{gpu_mem["reserved_bytes"]} -> '
+                        f'{post_gpu_mem["reserved_bytes"]} bytes)'
                     )
                     gpu_mem = post_gpu_mem
                 # pyrefly: ignore [bad-assignment]
-                result["gpu_mem"] = gpu_mem
-            logger.info(f"removed session {session_id}")
+                result['gpu_mem'] = gpu_mem
+            logger.info(f'removed session {session_id}')
         return result
 
     def _gpu_mem_snapshot(self) -> dict:
@@ -440,44 +432,38 @@ class Sam3BasePredictor:
         except RuntimeError:
             # No active CUDA context (e.g., CPU-only test env).
             return {
-                "free_bytes": 0,
-                "total_bytes": 0,
-                "allocated_bytes": 0,
-                "reserved_bytes": 0,
-                "free_pct": 0.0,
-                "active_session_count": active_count,
+                'free_bytes': 0,
+                'total_bytes': 0,
+                'allocated_bytes': 0,
+                'reserved_bytes': 0,
+                'free_pct': 0.0,
+                'active_session_count': active_count,
             }
         free_pct = (free_bytes / total_bytes) * 100 if total_bytes > 0 else 0.0
         # ``memory_allocated`` / ``memory_reserved`` are cheap host-side
         # bookkeeping reads (no CUDA sync) and complement
         # ``mem_get_info`` by exposing the caching-allocator pool size
         # vs the actual live tensor footprint.
-        allocated_bytes = (
-            torch.cuda.memory_allocated() if torch.cuda.is_available() else 0
-        )
-        reserved_bytes = (
-            torch.cuda.memory_reserved() if torch.cuda.is_available() else 0
-        )
+        allocated_bytes = torch.cuda.memory_allocated() if torch.cuda.is_available() else 0
+        reserved_bytes = torch.cuda.memory_reserved() if torch.cuda.is_available() else 0
         return {
-            "free_bytes": free_bytes,
-            "total_bytes": total_bytes,
-            "allocated_bytes": allocated_bytes,
-            "reserved_bytes": reserved_bytes,
-            "free_pct": free_pct,
-            "active_session_count": active_count,
+            'free_bytes': free_bytes,
+            'total_bytes': total_bytes,
+            'allocated_bytes': allocated_bytes,
+            'reserved_bytes': reserved_bytes,
+            'free_pct': free_pct,
+            'active_session_count': active_count,
         }
 
     def _get_session(self, session_id):
         session = self._all_inference_states.get(session_id, None)
         if session is None:
-            raise RuntimeError(
-                f"Cannot find session {session_id}; it might have expired"
-            )
+            raise RuntimeError(f'Cannot find session {session_id}; it might have expired')
         return session
 
     def _extend_expiration_time(self, session):
         """Update last-use time for session expiration tracking."""
-        session["last_use_time"] = time.time()
+        session['last_use_time'] = time.time()
 
     def shutdown(self):
         """Shutdown the predictor and clear all sessions."""

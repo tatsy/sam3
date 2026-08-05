@@ -13,9 +13,7 @@ except Exception:
     mask_utils = None
 
 
-def mask_intersection(
-    masks1: torch.Tensor, masks2: torch.Tensor, block_size: int = 16
-) -> torch.Tensor:
+def mask_intersection(masks1: torch.Tensor, masks2: torch.Tensor, block_size: int = 16) -> torch.Tensor:
     assert masks1.shape[1:] == masks2.shape[1:]
     assert masks1.dtype == torch.bool and masks2.dtype == torch.bool
     N, M = masks1.shape[0], masks2.shape[0]
@@ -43,20 +41,18 @@ def _decode_single_mask(mask_repr, h: int, w: int) -> np.ndarray:
     if isinstance(mask_repr, (list, tuple, np.ndarray)):
         arr = np.array(mask_repr)
         if arr.ndim != 2:
-            raise ValueError("Mask array must be 2D (H, W).")
+            raise ValueError('Mask array must be 2D (H, W).')
         return (arr > 0).astype(np.uint8)
 
     if mask_utils is None:
-        raise ImportError(
-            "pycocotools is required to decode RLE mask strings. pip install pycocotools"
-        )
+        raise ImportError('pycocotools is required to decode RLE mask strings. pip install pycocotools')
 
     if not isinstance(mask_repr, (str, bytes)):
-        raise ValueError("Unsupported mask representation type for RLE decode.")
+        raise ValueError('Unsupported mask representation type for RLE decode.')
 
     rle = {
-        "counts": mask_repr if isinstance(mask_repr, (str, bytes)) else str(mask_repr),
-        "size": [h, w],
+        'counts': mask_repr if isinstance(mask_repr, (str, bytes)) else str(mask_repr),
+        'size': [h, w],
     }
     decoded = mask_utils.decode(rle)
     if decoded.ndim == 3:
@@ -76,10 +72,10 @@ def remove_overlapping_masks(sample: Dict, iom_thresh: float = 0.3) -> Dict:
     If pred_masks has length 0 or 1, returns sample unchanged (no extra keys).
     """
     # Basic presence checks
-    if "pred_masks" not in sample or not isinstance(sample["pred_masks"], list):
+    if 'pred_masks' not in sample or not isinstance(sample['pred_masks'], list):
         return sample  # nothing to do / preserve as-is
 
-    pred_masks = sample["pred_masks"]
+    pred_masks = sample['pred_masks']
     N = len(pred_masks)
 
     # --- Early exit: 0 or 1 mask -> do NOT modify the JSON at all ---
@@ -87,14 +83,14 @@ def remove_overlapping_masks(sample: Dict, iom_thresh: float = 0.3) -> Dict:
         return sample
 
     # From here on we have at least 2 masks
-    h = int(sample["orig_img_h"])
-    w = int(sample["orig_img_w"])
-    pred_scores = sample.get("pred_scores", [1.0] * N)  # fallback if scores missing
-    pred_boxes = sample.get("pred_boxes", None)
+    h = int(sample['orig_img_h'])
+    w = int(sample['orig_img_w'])
+    pred_scores = sample.get('pred_scores', [1.0] * N)  # fallback if scores missing
+    pred_boxes = sample.get('pred_boxes', None)
 
-    assert N == len(pred_scores), "pred_masks and pred_scores must have same length"
+    assert N == len(pred_scores), 'pred_masks and pred_scores must have same length'
     if pred_boxes is not None:
-        assert N == len(pred_boxes), "pred_masks and pred_boxes must have same length"
+        assert N == len(pred_boxes), 'pred_masks and pred_boxes must have same length'
 
     masks_bool = _decode_masks_to_torch_bool(pred_masks, h, w)  # (N, H, W)
 
@@ -120,11 +116,11 @@ def remove_overlapping_masks(sample: Dict, iom_thresh: float = 0.3) -> Dict:
 
     # Build filtered JSON (this *does* modify fields; only for N>=2 case)
     out = dict(sample)
-    out["pred_masks"] = [pred_masks[i] for i in kept_idx_sorted]
-    out["pred_scores"] = [pred_scores[i] for i in kept_idx_sorted]
+    out['pred_masks'] = [pred_masks[i] for i in kept_idx_sorted]
+    out['pred_scores'] = [pred_scores[i] for i in kept_idx_sorted]
     if pred_boxes is not None:
-        out["pred_boxes"] = [pred_boxes[i] for i in kept_idx_sorted]
-    out["kept_indices"] = kept_idx_sorted
-    out["removed_indices"] = [i for i in range(N) if i not in set(kept_idx_sorted)]
-    out["iom_threshold"] = float(iom_thresh)
+        out['pred_boxes'] = [pred_boxes[i] for i in kept_idx_sorted]
+    out['kept_indices'] = kept_idx_sorted
+    out['removed_indices'] = [i for i in range(N) if i not in set(kept_idx_sorted)]
+    out['iom_threshold'] = float(iom_thresh)
     return out

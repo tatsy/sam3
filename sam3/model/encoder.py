@@ -116,9 +116,7 @@ class TransformerEncoderLayer(nn.Module):
         q = k = tgt + query_pos if self.pos_enc_at_attn else tgt
 
         # Self attention
-        tgt2 = self.self_attn(
-            q, k, value=tgt, attn_mask=tgt_mask, key_padding_mask=tgt_key_padding_mask
-        )[0]
+        tgt2 = self.self_attn(q, k, value=tgt, attn_mask=tgt_mask, key_padding_mask=tgt_key_padding_mask)[0]
         tgt = tgt + self.dropout1(tgt2)
         tgt = self.norm1(tgt)
 
@@ -181,9 +179,7 @@ class TransformerEncoderLayer(nn.Module):
             tgt = tgt[: tgt.shape[0] // 2]
         tgt2 = self.norm1(tgt)
         q = k = tgt2 + query_pos if self.pos_enc_at_attn else tgt2
-        tgt2 = self.self_attn(
-            q, k, value=tgt2, attn_mask=tgt_mask, key_padding_mask=tgt_key_padding_mask
-        )[0]
+        tgt2 = self.self_attn(q, k, value=tgt2, attn_mask=tgt_mask, key_padding_mask=tgt_key_padding_mask)[0]
         tgt = tgt + self.dropout1(tgt2)
         if dac:
             # Recombine
@@ -307,12 +303,8 @@ class TransformerEncoder(nn.Module):
             reference_points_list = []
             for lvl, (H_, W_) in enumerate(spatial_shapes):
                 ref_y, ref_x = torch.meshgrid(
-                    torch.linspace(
-                        0.5, H_ - 0.5, H_, dtype=torch.float32, device=device
-                    ),
-                    torch.linspace(
-                        0.5, W_ - 0.5, W_, dtype=torch.float32, device=device
-                    ),
+                    torch.linspace(0.5, H_ - 0.5, H_, dtype=torch.float32, device=device),
+                    torch.linspace(0.5, W_ - 0.5, W_, dtype=torch.float32, device=device),
                 )
                 ref_y = ref_y.reshape(-1)[None] / (valid_ratios[:, None, lvl, 1] * H_)
                 ref_x = ref_x.reshape(-1)[None] / (valid_ratios[:, None, lvl, 0] * W_)
@@ -324,9 +316,7 @@ class TransformerEncoder(nn.Module):
         return reference_points
 
     def _prepare_multilevel_features(self, srcs, masks, pos_embeds):
-        assert len(srcs) == self.num_feature_levels, (
-            "mismatch between expected and received # of feature levels"
-        )
+        assert len(srcs) == self.num_feature_levels, 'mismatch between expected and received # of feature levels'
 
         src_flatten = []
         mask_flatten = []
@@ -353,9 +343,7 @@ class TransformerEncoder(nn.Module):
         src_flatten = torch.cat(src_flatten, 1)  # bs, \sum{hxw}, c
         mask_flatten = torch.cat(mask_flatten, 1) if has_mask else None  # bs, \sum{hxw}
         lvl_pos_embed_flatten = torch.cat(lvl_pos_embed_flatten, 1)  # bs, \sum{hxw}, c
-        spatial_shapes = torch.tensor(
-            spatial_shapes, dtype=torch.long, device=src_flatten.device
-        )
+        spatial_shapes = torch.tensor(spatial_shapes, dtype=torch.long, device=src_flatten.device)
         level_start_index = torch.cat(
             (
                 spatial_shapes.new_zeros((1,)),
@@ -408,9 +396,7 @@ class TransformerEncoder(nn.Module):
             - spatial_shapes: Spatial dimensions of each feature level
             - valid_ratios: Valid ratios for each feature level
         """
-        assert len(src) == self.num_feature_levels, (
-            "must be equal to num_feature_levels"
-        )
+        assert len(src) == self.num_feature_levels, 'must be equal to num_feature_levels'
         if src_key_padding_masks is not None:
             assert len(src_key_padding_masks) == self.num_feature_levels
         if pos is not None:
@@ -425,23 +411,21 @@ class TransformerEncoder(nn.Module):
             spatial_shapes,
         ) = self._prepare_multilevel_features(src, src_key_padding_masks, pos)
 
-        reference_points = self.get_reference_points(
-            spatial_shapes, valid_ratios, device=src_flatten.device
-        )
+        reference_points = self.get_reference_points(spatial_shapes, valid_ratios, device=src_flatten.device)
 
         output = src_flatten
         for layer in self.layers:
             layer_kwargs = {}
 
             assert isinstance(layer, TransformerEncoderLayer)
-            layer_kwargs["memory"] = prompt
-            layer_kwargs["memory_key_padding_mask"] = prompt_key_padding_mask
-            layer_kwargs["query_pos"] = lvl_pos_embed_flatten
-            layer_kwargs["tgt"] = output
-            layer_kwargs["tgt_key_padding_mask"] = key_padding_masks_flatten
+            layer_kwargs['memory'] = prompt
+            layer_kwargs['memory_key_padding_mask'] = prompt_key_padding_mask
+            layer_kwargs['query_pos'] = lvl_pos_embed_flatten
+            layer_kwargs['tgt'] = output
+            layer_kwargs['tgt_key_padding_mask'] = key_padding_masks_flatten
 
             if self.training:
-                assert self.use_act_checkpoint, "activation ckpt not enabled in encoder"
+                assert self.use_act_checkpoint, 'activation ckpt not enabled in encoder'
             if encoder_extra_kwargs is not None:
                 layer_kwargs.update(encoder_extra_kwargs)
             output = activation_ckpt_wrapper(layer)(
@@ -451,11 +435,7 @@ class TransformerEncoder(nn.Module):
         # return as seq first
         return (
             output.transpose(0, 1),
-            (
-                key_padding_masks_flatten.transpose(0, 1)
-                if key_padding_masks_flatten is not None
-                else None
-            ),
+            (key_padding_masks_flatten.transpose(0, 1) if key_padding_masks_flatten is not None else None),
             lvl_pos_embed_flatten.transpose(0, 1),
             level_start_index,
             spatial_shapes,
@@ -505,9 +485,7 @@ class TransformerEncoderFusion(TransformerEncoder):
             self.text_pooling_proj = nn.Linear(d_model, d_model)
         self.pool_text_with_mask = pool_text_with_mask
         if compile_mode is not None:
-            self.forward = torch.compile(
-                self.forward, mode=compile_mode, fullgraph=True
-            )
+            self.forward = torch.compile(self.forward, mode=compile_mode, fullgraph=True)
 
     @staticmethod
     def get_reference_points(spatial_shapes, valid_ratios, device):
@@ -549,18 +527,12 @@ class TransformerEncoderFusion(TransformerEncoder):
                     else None
                 )
         else:
-            assert all(x.dim == 4 for x in src), (
-                "expected list of (bs, c, h, w) tensors"
-            )
+            assert all(x.dim == 4 for x in src), 'expected list of (bs, c, h, w) tensors'
 
         if self.add_pooled_text_to_img_feat:
             # Fusion: Add mean pooled text to image features
-            pooled_text = pool_text_feat(
-                prompt, prompt_key_padding_mask, self.pool_text_with_mask
-            )
-            pooled_text = self.text_pooling_proj(pooled_text)[
-                ..., None, None
-            ]  # prompt is seq first
+            pooled_text = pool_text_feat(prompt, prompt_key_padding_mask, self.pool_text_with_mask)
+            pooled_text = self.text_pooling_proj(pooled_text)[..., None, None]  # prompt is seq first
             src = [x.add_(pooled_text) for x in src]
 
         (
@@ -580,13 +552,13 @@ class TransformerEncoderFusion(TransformerEncoder):
         )
 
         return {
-            "memory": out,
-            "padding_mask": key_padding_masks_flatten,
-            "pos_embed": lvl_pos_embed_flatten,
-            "memory_text": prompt,
-            "level_start_index": level_start_index,
-            "spatial_shapes": spatial_shapes,
-            "valid_ratios": valid_ratios,
+            'memory': out,
+            'padding_mask': key_padding_masks_flatten,
+            'pos_embed': lvl_pos_embed_flatten,
+            'memory_text': prompt,
+            'level_start_index': level_start_index,
+            'spatial_shapes': spatial_shapes,
+            'valid_ratios': valid_ratios,
         }
 
 

@@ -45,9 +45,9 @@ class ROIAlign(nn.Module):
 
         from torchvision import __version__
 
-        version = tuple(int(x) for x in __version__.split(".")[:2])
+        version = tuple(int(x) for x in __version__.split('.')[:2])
         # https://github.com/pytorch/vision/pull/2438
-        assert version >= (0, 7), "Require torchvision >= 0.7"
+        assert version >= (0, 7), 'Require torchvision >= 0.7'
 
     def forward(self, input, rois):
         """
@@ -68,10 +68,10 @@ class ROIAlign(nn.Module):
         )
 
     def __repr__(self):
-        tmpstr = self.__class__.__name__ + "("
-        tmpstr += "output_size=" + str(self.output_size)
-        tmpstr += ", spatial_scale=" + str(self.spatial_scale)
-        tmpstr += ", sampling_ratio=" + str(self.sampling_ratio)
-        tmpstr += ", aligned=" + str(self.aligned)
-        tmpstr += ")"
+        tmpstr = self.__class__.__name__ + '('
+        tmpstr += 'output_size=' + str(self.output_size)
+        tmpstr += ', spatial_scale=' + str(self.spatial_scale)
+        tmpstr += ', sampling_ratio=' + str(self.sampling_ratio)
+        tmpstr += ', aligned=' + str(self.aligned)
+        tmpstr += ')'
         return tmpstr

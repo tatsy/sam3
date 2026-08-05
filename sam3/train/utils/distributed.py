@@ -38,13 +38,13 @@ def _get_global_gloo_group():
     The result is cached.
     """
 
-    if dist.get_backend() == "nccl":
+    if dist.get_backend() == 'nccl':
         # Increase timeout from 1800 sec to 43200 sec (12 hr) to avoid some processes
         # being much slower than others causing a timeout (which can happen in relation
         # or LVIS class mAP evaluation).
         timeout = 43200
         return dist.new_group(
-            backend="gloo",
+            backend='gloo',
             timeout=datetime.timedelta(seconds=timeout),
         )
 
@@ -68,18 +68,18 @@ def all_gather_via_filesys(data, filesys_save_dir=None, gather_to_rank_0_only=Fa
     if world_size == 1:
         return [data]
 
-    print("gathering via files")
+    print('gathering via files')
     cpu_group = _get_global_gloo_group()
 
     # if unspecified, we will save to the current python file dir
     if filesys_save_dir is not None:
         save_dir = filesys_save_dir
-    elif "EXP_DIR" in os.environ:
-        save_dir = os.environ["EXP_DIR"]
+    elif 'EXP_DIR' in os.environ:
+        save_dir = os.environ['EXP_DIR']
     else:
         # try the same directory where the code is stored
         save_dir = filesys_save_dir or os.path.dirname(__file__)
-    save_dir = os.path.join(save_dir, "all_gather_via_filesys")
+    save_dir = os.path.join(save_dir, 'all_gather_via_filesys')
     if is_main_process():
         os.makedirs(save_dir, exist_ok=True)
 
@@ -94,9 +94,9 @@ def all_gather_via_filesys(data, filesys_save_dir=None, gather_to_rank_0_only=Fa
 
     # save the data to a file on the disk
     rank_save = get_rank()
-    save_data_filename = f"data_to_gather_{timestamp}_{salt}_{rank_save}.pkl"
+    save_data_filename = f'data_to_gather_{timestamp}_{salt}_{rank_save}.pkl'
     save_data_path = os.path.join(save_dir, save_data_filename)
-    assert not os.path.exists(save_data_path), f"{save_data_path} already exists"
+    assert not os.path.exists(save_data_path), f'{save_data_path} already exists'
     torch.save(data, save_data_path)
     dist.barrier(group=cpu_group)
 
@@ -104,9 +104,9 @@ def all_gather_via_filesys(data, filesys_save_dir=None, gather_to_rank_0_only=Fa
     data_list = []
     if rank_save == 0 or not gather_to_rank_0_only:
         for rank_load in range(world_size):
-            load_data_filename = f"data_to_gather_{timestamp}_{salt}_{rank_load}.pkl"
+            load_data_filename = f'data_to_gather_{timestamp}_{salt}_{rank_load}.pkl'
             load_data_path = os.path.join(save_dir, load_data_filename)
-            assert os.path.exists(load_data_path), f"cannot read {save_data_path}"
+            assert os.path.exists(load_data_path), f'cannot read {save_data_path}'
             data_list.append(torch.load(load_data_path, weights_only=False))
     dist.barrier(group=cpu_group)
 
@@ -128,33 +128,29 @@ def all_gather(data, force_cpu=False, force_filesys=False, filesys_save_dir=None
     if world_size == 1:
         return [data]
 
-    if os.getenv("MDETR_FILESYS_REDUCE_RANK_0_ONLY") == "1":
-        return all_gather_via_filesys(
-            data, filesys_save_dir, gather_to_rank_0_only=True
-        )
+    if os.getenv('MDETR_FILESYS_REDUCE_RANK_0_ONLY') == '1':
+        return all_gather_via_filesys(data, filesys_save_dir, gather_to_rank_0_only=True)
 
-    if os.getenv("MDETR_FILESYS_REDUCE") == "1" or force_filesys:
+    if os.getenv('MDETR_FILESYS_REDUCE') == '1' or force_filesys:
         return all_gather_via_filesys(data, filesys_save_dir)
 
     cpu_group = None
-    if os.getenv("MDETR_CPU_REDUCE") == "1" or force_cpu:
+    if os.getenv('MDETR_CPU_REDUCE') == '1' or force_cpu:
         cpu_group = _get_global_gloo_group()
 
     buffer = io.BytesIO()
     torch.save(data, buffer)
     data_view = buffer.getbuffer()
-    device = "cuda" if cpu_group is None else "cpu"
+    device = 'cuda' if cpu_group is None else 'cpu'
     tensor = torch.ByteTensor(data_view).to(device)
 
     # obtain Tensor size of each rank
     local_size = torch.tensor([tensor.numel()], device=device, dtype=torch.long)
-    size_list = [
-        torch.tensor([0], device=device, dtype=torch.long) for _ in range(world_size)
-    ]
+    size_list = [torch.tensor([0], device=device, dtype=torch.long) for _ in range(world_size)]
     if cpu_group is None:
         dist.all_gather(size_list, local_size)
     else:
-        print("gathering on cpu")
+        print('gathering on cpu')
         dist.all_gather(size_list, local_size, group=cpu_group)
     size_list = [int(size.item()) for size in size_list]
     max_size = max(size_list)
@@ -168,9 +164,7 @@ def all_gather(data, force_cpu=False, force_filesys=False, filesys_save_dir=None
     for _ in size_list:
         tensor_list.append(torch.empty((max_size,), dtype=torch.uint8, device=device))
     if local_size != max_size:
-        padding = torch.empty(
-            size=(max_size - local_size,), dtype=torch.uint8, device=device
-        )
+        padding = torch.empty(size=(max_size - local_size,), dtype=torch.uint8, device=device)
         tensor = torch.cat((tensor, padding), dim=0)
     if cpu_group is None:
         dist.all_gather(tensor_list, tensor)
@@ -193,7 +187,7 @@ def convert_to_distributed_tensor(tensor: torch.Tensor) -> Tuple[torch.Tensor, s
     tensor is on the GPU. This helper function converts to the correct
     device and returns the tensor + original device.
     """
-    orig_device = "cpu" if not tensor.is_cuda else "gpu"
+    orig_device = 'cpu' if not tensor.is_cuda else 'gpu'
     if (
         torch.distributed.is_available()
         and torch.distributed.get_backend() == torch.distributed.Backend.NCCL
@@ -208,7 +202,7 @@ def convert_to_normal_tensor(tensor: torch.Tensor, orig_device: str) -> torch.Te
     For some backends, such as NCCL, communication only works if the
     tensor is on the GPU. This converts the tensor back to original device.
     """
-    if tensor.is_cuda and orig_device == "cpu":
+    if tensor.is_cuda and orig_device == 'cpu':
         tensor = tensor.cpu()
     return tensor
 
@@ -300,14 +294,9 @@ def gather_tensors_from_all(tensor: torch.Tensor) -> List[torch.Tensor]:
 
     if is_distributed_training_run():
         tensor, orig_device = convert_to_distributed_tensor(tensor)
-        gathered_tensors = [
-            torch.zeros_like(tensor) for _ in range(torch.distributed.get_world_size())
-        ]
+        gathered_tensors = [torch.zeros_like(tensor) for _ in range(torch.distributed.get_world_size())]
         torch.distributed.all_gather(gathered_tensors, tensor)
-        gathered_tensors = [
-            convert_to_normal_tensor(_tensor, orig_device)
-            for _tensor in gathered_tensors
-        ]
+        gathered_tensors = [convert_to_normal_tensor(_tensor, orig_device) for _tensor in gathered_tensors]
     else:
         gathered_tensors = [tensor]
 
@@ -360,9 +349,7 @@ def get_rank() -> int:
     / non-distributed settings
     """
     return (
-        torch.distributed.get_rank()
-        if torch.distributed.is_available() and torch.distributed.is_initialized()
-        else 0
+        torch.distributed.get_rank() if torch.distributed.is_available() and torch.distributed.is_initialized() else 0
     )
 
 
@@ -441,7 +428,7 @@ def broadcast_object(obj: Any, src: int = _PRIMARY_RANK, use_disk: bool = True) 
         data_tensor = torch.empty([length_tensor.item()], dtype=torch.uint8)
         data_tensor = broadcast(data_tensor, src=src)
         if use_disk:
-            with tempfile.TemporaryFile("r+b") as f:
+            with tempfile.TemporaryFile('r+b') as f:
                 # pyrefly: ignore [bad-argument-type]
                 f.write(data_tensor.numpy())
                 # remove reference to the data tensor and hope that Python garbage
@@ -460,13 +447,11 @@ def all_gather_tensor(tensor: torch.Tensor, world_size=None):
     if world_size is None:
         world_size = get_world_size()
     # make contiguous because NCCL won't gather the tensor otherwise
-    assert tensor.is_contiguous(), f"{tensor.shape} is not contiguous!"
+    assert tensor.is_contiguous(), f'{tensor.shape} is not contiguous!'
     tensor, orig_device = convert_to_distributed_tensor(tensor)
     tensor_all = [torch.ones_like(tensor) for _ in range(world_size)]
     dist.all_gather(tensor_all, tensor, async_op=False)  # performance opt
-    tensor_all = [
-        convert_to_normal_tensor(tensor, orig_device) for tensor in tensor_all
-    ]
+    tensor_all = [convert_to_normal_tensor(tensor, orig_device) for tensor in tensor_all]
     return tensor_all
 
 
@@ -557,8 +542,8 @@ def create_new_process_group(group_size):
     if world_size <= 8:
         if group_size > world_size:
             logging.warning(
-                f"Requested group size [{group_size}] > world size [{world_size}]. "
-                "Assuming local debug run and capping it to world size."
+                f'Requested group size [{group_size}] > world size [{world_size}]. '
+                'Assuming local debug run and capping it to world size.'
             )
             group_size = world_size
     assert world_size >= group_size

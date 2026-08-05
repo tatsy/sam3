@@ -15,7 +15,7 @@ class DummyLoss(torch.nn.Module):
     def __init__(
         self,
         core_loss_key: str = CORE_LOSS_KEY,
-        device: str = "cuda",
+        device: str = 'cuda',
         **kwargs,
     ):
         super().__init__()
@@ -38,7 +38,7 @@ class Sam3LossWrapper(torch.nn.Module):
     def __init__(
         self,
         loss_fns_find,
-        normalization="global",
+        normalization='global',
         matcher=None,
         o2m_matcher=None,
         o2m_weight=1.0,
@@ -50,7 +50,7 @@ class Sam3LossWrapper(torch.nn.Module):
     ):
         super().__init__()
         self.loss_fns_find = loss_fns_find
-        assert normalization in ["global", "local", "none"]
+        assert normalization in ['global', 'local', 'none']
         self.normalization = normalization
         self.normalize_by_valid_object_num = normalize_by_valid_object_num
         self.normalize_by_stage_num = normalize_by_stage_num
@@ -67,33 +67,30 @@ class Sam3LossWrapper(torch.nn.Module):
         if self.normalize_by_valid_object_num:
             # valid boxes are those with non-zero height and width
             # (while padded invisible boxes are )
-            boxes_hw = targets["boxes"].view(-1, 4)  # cx, cy, w, h
+            boxes_hw = targets['boxes'].view(-1, 4)  # cx, cy, w, h
             num_boxes = (boxes_hw[:, 2:] > 0).all(dim=-1).sum().float()
         else:
-            num_boxes = targets["num_boxes"].sum().float()
-        if self.normalization == "global":
+            num_boxes = targets['num_boxes'].sum().float()
+        if self.normalization == 'global':
             torch.distributed.all_reduce(num_boxes)
             num_boxes = torch.clamp(num_boxes / get_world_size(), min=1)
-        elif self.normalization == "local":
+        elif self.normalization == 'local':
             num_boxes = torch.clamp(num_boxes, min=1)
-        elif self.normalization == "none":
+        elif self.normalization == 'none':
             num_boxes = 1
         return num_boxes
 
     def compute_loss(self, nested_out, targets):
         num_boxes = self._get_num_boxes(targets)
-        o2m_out_is_valid = nested_out.get("o2m_out_is_valid", None)
-        o2m_target_is_valid_padded = nested_out.get("o2m_target_is_valid_padded", None)
+        o2m_out_is_valid = nested_out.get('o2m_out_is_valid', None)
+        o2m_target_is_valid_padded = nested_out.get('o2m_target_is_valid_padded', None)
 
         # Get a list of outputs, including auxiliary and first stage outputs
-        output_list = [(nested_out, "", False)]  # (out, suffix, is_aux)
-        if "aux_outputs" in nested_out:
-            output_list.extend(
-                (aux_out, f"_aux_{i}", True)
-                for i, aux_out in enumerate(nested_out["aux_outputs"])
-            )
-        if "first_stage" in nested_out:
-            output_list.append((nested_out["first_stage"], "_fs", True))
+        output_list = [(nested_out, '', False)]  # (out, suffix, is_aux)
+        if 'aux_outputs' in nested_out:
+            output_list.extend((aux_out, f'_aux_{i}', True) for i, aux_out in enumerate(nested_out['aux_outputs']))
+        if 'first_stage' in nested_out:
+            output_list.append((nested_out['first_stage'], '_fs', True))
 
         # Compute all the requested losses
         losses = {}
@@ -101,12 +98,10 @@ class Sam3LossWrapper(torch.nn.Module):
         for out, suffix, is_aux in output_list:
             # o2o matcher indices need to be computed by the model (as the video model requires
             # a specific way of matching free and locked indices beyond just calling the matcher)
-            indices = out["indices"]
-            has_o2m_out = "pred_logits_o2m" in out
+            indices = out['indices']
+            has_o2m_out = 'pred_logits_o2m' in out
             if has_o2m_out:
-                o2m_out = {
-                    k[: -len("_o2m")]: v for k, v in out.items() if k.endswith("_o2m")
-                }
+                o2m_out = {k[: -len('_o2m')]: v for k, v in out.items() if k.endswith('_o2m')}
                 # o2m targets are the same as the o2o targets (assuming repeat=1)
                 o2m_targets = targets
                 if self.use_o2m_matcher_on_o2m_aux or not is_aux:
@@ -133,13 +128,13 @@ class Sam3LossWrapper(torch.nn.Module):
                     is_aux=is_aux,
                 )
                 total_core_loss += l_dict.pop(CORE_LOSS_KEY)
-                losses.update({f"{k}{suffix}": v for k, v in l_dict.items()})
+                losses.update({f'{k}{suffix}': v for k, v in l_dict.items()})
 
                 compute_o2m_loss = has_o2m_out
                 # a special handling to allow turning off mask loss in o2m
                 # (to be compatible with the original implementation)
                 if isinstance(loss_fn, Masks):
-                    compute_o2m_loss = compute_o2m_loss and "pred_masks" in o2m_out
+                    compute_o2m_loss = compute_o2m_loss and 'pred_masks' in o2m_out
                 if isinstance(loss_fn, Det2TrkAssoc):
                     compute_o2m_loss = False  # Det2TrkAssoc does not support o2m
                 if compute_o2m_loss:
@@ -153,7 +148,7 @@ class Sam3LossWrapper(torch.nn.Module):
                     for k in l_dict:
                         l_dict[k] *= self.o2m_weight
                     total_core_loss += l_dict.pop(CORE_LOSS_KEY)
-                    losses.update({f"{k}{suffix}_o2m": v for k, v in l_dict.items()})
+                    losses.update({f'{k}{suffix}_o2m': v for k, v in l_dict.items()})
 
         losses[CORE_LOSS_KEY] = total_core_loss
         return losses
@@ -161,9 +156,7 @@ class Sam3LossWrapper(torch.nn.Module):
     def forward(self, find_stages: SAM3Output, find_targets):
         if find_stages.loss_stages is not None:
             find_targets = [find_targets[i] for i in find_stages.loss_stages]
-        with SAM3Output.iteration_mode(
-            find_stages, iter_mode=SAM3Output.IterMode.ALL_STEPS_PER_STAGE
-        ) as find_stages:
+        with SAM3Output.iteration_mode(find_stages, iter_mode=SAM3Output.IterMode.ALL_STEPS_PER_STAGE) as find_stages:
             assert len(find_stages) == len(find_targets)
             total_losses = {}
             for stage_outputs, stage_targets in zip(find_stages, find_targets):
@@ -173,12 +166,8 @@ class Sam3LossWrapper(torch.nn.Module):
                     cur_losses = self.compute_loss(outputs, targets)
 
                     if self.loss_fn_semantic_seg is not None:
-                        cur_losses_semantic = self.loss_fn_semantic_seg(
-                            outputs, targets
-                        )
-                        cur_losses[CORE_LOSS_KEY] += cur_losses_semantic.pop(
-                            CORE_LOSS_KEY
-                        )
+                        cur_losses_semantic = self.loss_fn_semantic_seg(outputs, targets)
+                        cur_losses[CORE_LOSS_KEY] += cur_losses_semantic.pop(CORE_LOSS_KEY)
                         # make sure the semantic losses don't overlap with the find losses
                         assert set(cur_losses).isdisjoint(set(cur_losses_semantic))
                         cur_losses.update(cur_losses_semantic)
@@ -190,7 +179,7 @@ class Sam3LossWrapper(torch.nn.Module):
                         cur_losses[CORE_LOSS_KEY] /= len(find_stages)
 
                     if self.scale_by_find_batch_size:
-                        bs = targets["num_boxes"].shape[0]
+                        bs = targets['num_boxes'].shape[0]
                         # sqrt scaling based on the "effective" batch size
                         cur_losses[CORE_LOSS_KEY] *= bs**0.5
 

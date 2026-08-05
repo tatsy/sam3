@@ -77,12 +77,8 @@ def render_zoom_in(
             w_new_large = min(w_new * ratio_large, img_w)
             h_new_large = min(h_new * ratio_large, img_h)
 
-        w_shift_large = _get_shift(
-            mask_box_xywh[0], mask_box_xywh[2], w_new_large, img_w
-        )
-        h_shift_large = _get_shift(
-            mask_box_xywh[1], mask_box_xywh[3], h_new_large, img_h
-        )
+        w_shift_large = _get_shift(mask_box_xywh[0], mask_box_xywh[2], w_new_large, img_w)
+        h_shift_large = _get_shift(mask_box_xywh[1], mask_box_xywh[3], h_new_large, img_h)
         zoom_in_box = [
             mask_box_xywh[0] - w_shift_large,
             mask_box_xywh[1] - h_shift_large,
@@ -97,12 +93,8 @@ def render_zoom_in(
             w_new_medium = min(w_new * ratio_med, img_w)
             h_new_medium = min(h_new * ratio_med, img_h)
 
-        w_shift_medium = _get_shift(
-            mask_box_xywh[0], mask_box_xywh[2], w_new_medium, img_w
-        )
-        h_shift_medium = _get_shift(
-            mask_box_xywh[1], mask_box_xywh[3], h_new_medium, img_h
-        )
+        w_shift_medium = _get_shift(mask_box_xywh[0], mask_box_xywh[2], w_new_medium, img_w)
+        h_shift_medium = _get_shift(mask_box_xywh[1], mask_box_xywh[3], h_new_medium, img_h)
         img_crop_box = [
             mask_box_xywh[0] - w_shift_medium,
             mask_box_xywh[1] - h_shift_medium,
@@ -113,9 +105,9 @@ def render_zoom_in(
 
     # ---- main body ----
     # Input parsing
-    object_label = object_data["labels"][0]["noun_phrase"]
-    img = image_file.convert("RGB")
-    bbox_xywh = mask_utils.toBbox(object_data["segmentation"])  # [x, y, w, h]
+    object_label = object_data['labels'][0]['noun_phrase']
+    img = image_file.convert('RGB')
+    bbox_xywh = mask_utils.toBbox(object_data['segmentation'])  # [x, y, w, h]
 
     # Choose a stable, visually distant color based on crop
     bbox_xyxy = [
@@ -128,11 +120,11 @@ def render_zoom_in(
     color_palette = ColorPalette.default()
     color_obj, _ = color_palette.find_farthest_color(np.array(crop_img))
     color = np.array([color_obj.r / 255, color_obj.g / 255, color_obj.b / 255])
-    color_hex = f"#{color_obj.r:02x}{color_obj.g:02x}{color_obj.b:02x}"
+    color_hex = f'#{color_obj.r:02x}{color_obj.g:02x}{color_obj.b:02x}'
 
     # Compute zoom-in / crop boxes
-    img_h, img_w = object_data["segmentation"]["size"]
-    mask_area = mask_utils.area(object_data["segmentation"])
+    img_h, img_w = object_data['segmentation']['size']
+    mask_area = mask_utils.area(object_data['segmentation'])
     zoom_in_box, img_crop_box = _get_zoom_in_box(bbox_xywh, img_h, img_w, mask_area)
 
     # Layout choice
@@ -157,7 +149,7 @@ def render_zoom_in(
         bbox_xywh[3],
     ]
     ax1.imshow(img1)
-    ax1.axis("off")
+    ax1.axis('off')
     if show_box:
         draw_box(ax1, bbox_xywh_rel, edge_color=color)
     if show_text:
@@ -165,9 +157,9 @@ def render_zoom_in(
         draw_text(ax1, object_label, [x0, y0], color=color)
 
     # Panel 2: zoomed-in mask overlay
-    binary_mask = mask_utils.decode(object_data["segmentation"])
-    alpha = Image.fromarray((binary_mask * 255).astype("uint8"))
-    img_rgba = img.convert("RGBA")
+    binary_mask = mask_utils.decode(object_data['segmentation'])
+    alpha = Image.fromarray((binary_mask * 255).astype('uint8'))
+    img_rgba = img.convert('RGBA')
     img_rgba.putalpha(alpha)
     zoom_in_box_xyxy = [
         zoom_in_box[0],
@@ -179,17 +171,15 @@ def render_zoom_in(
     alpha_zoomin = img_with_alpha_zoomin.split()[3]
     binary_mask_zoomin = np.array(alpha_zoomin).astype(bool)
 
-    ax2.imshow(img_with_alpha_zoomin.convert("RGB"))
-    ax2.axis("off")
-    draw_mask(
-        ax2, binary_mask_zoomin, color=color, show_holes=show_holes, alpha=mask_alpha
-    )
+    ax2.imshow(img_with_alpha_zoomin.convert('RGB'))
+    ax2.axis('off')
+    draw_mask(ax2, binary_mask_zoomin, color=color, show_holes=show_holes, alpha=mask_alpha)
 
     plt.tight_layout()
 
     # Buffer -> PIL.Image
     buf = io.BytesIO()
-    fig.savefig(buf, format="png", bbox_inches="tight", pad_inches=0, dpi=100)
+    fig.savefig(buf, format='png', bbox_inches='tight', pad_inches=0, dpi=100)
     plt.close(fig)
     buf.seek(0)
     pil_img = Image.open(buf)

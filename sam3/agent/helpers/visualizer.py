@@ -28,7 +28,7 @@ from .rotated_boxes import RotatedBoxes
 logger = logging.getLogger(__name__)
 
 
-__all__ = ["ColorMode", "VisImage", "Visualizer"]
+__all__ = ['ColorMode', 'VisImage', 'Visualizer']
 
 
 _SMALL_OBJECT_AREA_THRESH = 1000
@@ -79,9 +79,9 @@ class GenericMask:
         m = mask_or_polygons
         if isinstance(m, dict):
             # RLEs
-            assert "counts" in m and "size" in m
-            if isinstance(m["counts"], list):  # uncompressed RLEs
-                h, w = m["size"]
+            assert 'counts' in m and 'size' in m
+            if isinstance(m['counts'], list):  # uncompressed RLEs
+                h, w = m['size']
                 assert h == height and w == width
                 m = mask_util.frPyObjects(m, h, w)
             self._mask = mask_util.decode(m)[:, :]
@@ -96,13 +96,11 @@ class GenericMask:
             assert m.shape == (
                 height,
                 width,
-            ), f"mask shape: {m.shape}, target dims: {height}, {width}"
-            self._mask = m.astype("uint8")
+            ), f'mask shape: {m.shape}, target dims: {height}, {width}'
+            self._mask = m.astype('uint8')
             return
 
-        raise ValueError(
-            "GenericMask cannot handle object {} of type '{}'".format(m, type(m))
-        )
+        raise ValueError("GenericMask cannot handle object {} of type '{}'".format(m, type(m)))
 
     @property
     def mask(self):
@@ -122,9 +120,7 @@ class GenericMask:
             if self._mask is not None:
                 self._polygons, self._has_holes = self.mask_to_polygons(self._mask)
             else:
-                self._has_holes = (
-                    False  # if original format is polygon, does not have holes
-                )
+                self._has_holes = False  # if original format is polygon, does not have holes
         return self._has_holes
 
     def mask_to_polygons(self, mask):
@@ -132,12 +128,8 @@ class GenericMask:
         # hierarchy. External contours (boundary) of the object are placed in hierarchy-1.
         # Internal contours (holes) are placed in hierarchy-2.
         # cv2.CHAIN_APPROX_NONE flag gets vertices of polygons from contours.
-        mask = np.ascontiguousarray(
-            mask
-        )  # some versions of cv2 does not support incontiguous arr
-        res = cv2.findContours(
-            mask.astype("uint8"), cv2.RETR_CCOMP, cv2.CHAIN_APPROX_NONE
-        )
+        mask = np.ascontiguousarray(mask)  # some versions of cv2 does not support incontiguous arr
+        res = cv2.findContours(mask.astype('uint8'), cv2.RETR_CCOMP, cv2.CHAIN_APPROX_NONE)
         hierarchy = res[-1]
         if hierarchy is None:  # empty mask
             return [], False
@@ -186,21 +178,19 @@ class _PanopticPrediction:
                     # VOID region.
                     continue
                 pred_class = panoptic_label // label_divisor
-                isthing = (
-                    pred_class in metadata.thing_dataset_id_to_contiguous_id.values()
-                )
+                isthing = pred_class in metadata.thing_dataset_id_to_contiguous_id.values()
                 segments_info.append(
                     {
-                        "id": int(panoptic_label),
-                        "category_id": int(pred_class),
-                        "isthing": bool(isthing),
+                        'id': int(panoptic_label),
+                        'category_id': int(pred_class),
+                        'isthing': bool(isthing),
                     }
                 )
         del metadata
 
         self._seg = panoptic_seg
 
-        self._sinfo = {s["id"]: s for s in segments_info}  # seg id -> seg info
+        self._sinfo = {s['id']: s for s in segments_info}  # seg id -> seg info
         segment_ids, areas = torch.unique(panoptic_seg, sorted=True, return_counts=True)
         areas = areas.numpy()
         sorted_idxs = np.argsort(-areas)
@@ -208,7 +198,7 @@ class _PanopticPrediction:
         self._seg_ids = self._seg_ids.tolist()
         for sid, area in zip(self._seg_ids, self._seg_areas):
             if sid in self._sinfo:
-                self._sinfo[sid]["area"] = float(area)
+                self._sinfo[sid]['area'] = float(area)
 
     def non_empty_mask(self):
         """
@@ -221,15 +211,13 @@ class _PanopticPrediction:
                 empty_ids.append(id)
         if len(empty_ids) == 0:
             return np.zeros(self._seg.shape, dtype=np.uint8)
-        assert len(empty_ids) == 1, (
-            ">1 ids corresponds to no labels. This is currently not supported"
-        )
+        assert len(empty_ids) == 1, '>1 ids corresponds to no labels. This is currently not supported'
         return (self._seg != empty_ids[0]).numpy().astype(np.bool)
 
     def semantic_masks(self):
         for sid in self._seg_ids:
             sinfo = self._sinfo.get(sid)
-            if sinfo is None or sinfo["isthing"]:
+            if sinfo is None or sinfo['isthing']:
                 # Some pixels (e.g. id 0 in PanopticFPN) have no instance or semantic predictions.
                 continue
             yield (self._seg == sid).numpy().astype(np.bool), sinfo
@@ -237,7 +225,7 @@ class _PanopticPrediction:
     def instance_masks(self):
         for sid in self._seg_ids:
             sinfo = self._sinfo.get(sid)
-            if sinfo is None or not sinfo["isthing"]:
+            if sinfo is None or not sinfo['isthing']:
                 continue
             mask = (self._seg == sid).numpy().astype(np.bool)
             if mask.sum() > 0:
@@ -263,11 +251,11 @@ def _create_text_labels(classes, scores, class_names, is_crowd=None):
             labels = [str(i) for i in classes]
     if scores is not None:
         if labels is None:
-            labels = ["{:.0f}%".format(s * 100) for s in scores]
+            labels = ['{:.0f}%'.format(s * 100) for s in scores]
         else:
-            labels = ["{} {:.0f}%".format(l, s * 100) for l, s in zip(labels, scores)]
+            labels = ['{} {:.0f}%'.format(l, s * 100) for l, s in zip(labels, scores)]
     if labels is not None and is_crowd is not None:
-        labels = [l + ("|crowd" if crowd else "") for l, crowd in zip(labels, is_crowd)]
+        labels = [l + ('|crowd' if crowd else '') for l, crowd in zip(labels, is_crowd)]
     return labels
 
 
@@ -303,7 +291,7 @@ class VisImage:
         self.canvas = FigureCanvasAgg(fig)
         # self.canvas = mpl.backends.backend_cairo.FigureCanvasCairo(fig)
         ax = fig.add_axes([0.0, 0.0, 1.0, 1.0])
-        ax.axis("off")
+        ax.axis('off')
         self.fig = fig
         self.ax = ax
         self.reset_image(img)
@@ -313,10 +301,8 @@ class VisImage:
         Args:
             img: same as in __init__
         """
-        img = img.astype("uint8")
-        self.ax.imshow(
-            img, extent=(0, self.width, self.height, 0), interpolation="nearest"
-        )
+        img = img.astype('uint8')
+        self.ax.imshow(img, extent=(0, self.width, self.height, 0), interpolation='nearest')
 
     def save(self, filepath):
         """
@@ -340,11 +326,11 @@ class VisImage:
         # width, height = self.width, self.height
         # s = buf.getvalue()
 
-        buffer = np.frombuffer(s, dtype="uint8")
+        buffer = np.frombuffer(s, dtype='uint8')
 
         img_rgba = buffer.reshape(height, width, 4)
         rgb, alpha = np.split(img_rgba, [3], axis=2)
-        return rgb.astype("uint8")
+        return rgb.astype('uint8')
 
 
 class Visualizer:
@@ -397,12 +383,11 @@ class Visualizer:
         #     metadata = MetadataCatalog.get("__nonexist__")
         # self.metadata = metadata
         self.output = VisImage(self.img, scale=scale)
-        self.cpu_device = torch.device("cpu")
+        self.cpu_device = torch.device('cpu')
 
         # too small texts are useless, therefore clamp to 9
         self._default_font_size = (
-            max(np.sqrt(self.output.height * self.output.width) // 60, 15 // scale)
-            * font_size_multiplier
+            max(np.sqrt(self.output.height * self.output.width) // 60, 15 // scale) * font_size_multiplier
         )
         # self._default_font_size = 18
         self._instance_mode = instance_mode
@@ -411,9 +396,7 @@ class Visualizer:
         import matplotlib.colors as mcolors
 
         css4_colors = mcolors.CSS4_COLORS
-        self.color_proposals = [
-            list(mcolors.hex2color(color)) for color in css4_colors.values()
-        ]
+        self.color_proposals = [list(mcolors.hex2color(color)) for color in css4_colors.values()]
 
     def draw_instance_predictions(self, predictions):
         """
@@ -427,19 +410,11 @@ class Visualizer:
         Returns:
             output (VisImage): image object with visualizations.
         """
-        boxes = predictions.pred_boxes if predictions.has("pred_boxes") else None
-        scores = predictions.scores if predictions.has("scores") else None
-        classes = (
-            predictions.pred_classes.tolist()
-            if predictions.has("pred_classes")
-            else None
-        )
-        labels = _create_text_labels(
-            classes, scores, self.metadata.get("thing_classes", None)
-        )
-        keypoints = (
-            predictions.pred_keypoints if predictions.has("pred_keypoints") else None
-        )
+        boxes = predictions.pred_boxes if predictions.has('pred_boxes') else None
+        scores = predictions.scores if predictions.has('scores') else None
+        classes = predictions.pred_classes.tolist() if predictions.has('pred_classes') else None
+        labels = _create_text_labels(classes, scores, self.metadata.get('thing_classes', None))
+        keypoints = predictions.pred_keypoints if predictions.has('pred_keypoints') else None
 
         keep = (scores > 0.5).cpu()
         boxes = boxes[keep]
@@ -449,23 +424,16 @@ class Visualizer:
         labels = np.array(labels)
         labels = labels[np.array(keep)]
 
-        if predictions.has("pred_masks"):
+        if predictions.has('pred_masks'):
             masks = np.asarray(predictions.pred_masks)
             masks = masks[np.array(keep)]
-            masks = [
-                GenericMask(x, self.output.height, self.output.width) for x in masks
-            ]
+            masks = [GenericMask(x, self.output.height, self.output.width) for x in masks]
         else:
             masks = None
 
-        if self._instance_mode == ColorMode.SEGMENTATION and self.metadata.get(
-            "thing_colors"
-        ):
+        if self._instance_mode == ColorMode.SEGMENTATION and self.metadata.get('thing_colors'):
             # if self.metadata.get("thing_colors"):
-            colors = [
-                self._jitter([x / 255 for x in self.metadata.thing_colors[c]])
-                for c in classes
-            ]
+            colors = [self._jitter([x / 255 for x in self.metadata.thing_colors[c]]) for c in classes]
             alpha = 0.4
         else:
             colors = None
@@ -474,9 +442,7 @@ class Visualizer:
         if self._instance_mode == ColorMode.IMAGE_BW:
             self.output.reset_image(
                 self._create_grayscale_image(
-                    (predictions.pred_masks.any(dim=0) > 0).numpy()
-                    if predictions.has("pred_masks")
-                    else None
+                    (predictions.pred_masks.any(dim=0) > 0).numpy() if predictions.has('pred_masks') else None
                 )
             )
             alpha = 0.3
@@ -527,9 +493,7 @@ class Visualizer:
             )
         return self.output
 
-    def draw_panoptic_seg(
-        self, panoptic_seg, segments_info, area_threshold=None, alpha=0.7
-    ):
+    def draw_panoptic_seg(self, panoptic_seg, segments_info, area_threshold=None, alpha=0.7):
         """
         Draw panoptic prediction annotations or results.
 
@@ -552,17 +516,13 @@ class Visualizer:
 
         # draw mask for all semantic segments first i.e. "stuff"
         for mask, sinfo in pred.semantic_masks():
-            category_idx = sinfo["category_id"]
+            category_idx = sinfo['category_id']
             try:
                 mask_color = [x / 255 for x in self.metadata.stuff_colors[category_idx]]
             except AttributeError:
                 mask_color = None
 
-            text = (
-                self.metadata.stuff_classes[category_idx]
-                .replace("-other", "")
-                .replace("-merged", "")
-            )
+            text = self.metadata.stuff_classes[category_idx].replace('-other', '').replace('-merged', '')
             self.draw_binary_mask(
                 mask,
                 color=mask_color,
@@ -577,30 +537,20 @@ class Visualizer:
         if len(all_instances) == 0:
             return self.output
         masks, sinfo = list(zip(*all_instances))
-        category_ids = [x["category_id"] for x in sinfo]
+        category_ids = [x['category_id'] for x in sinfo]
 
         try:
-            scores = [x["score"] for x in sinfo]
+            scores = [x['score'] for x in sinfo]
         except KeyError:
             scores = None
-        class_names = [
-            name.replace("-other", "").replace("-merged", "")
-            for name in self.metadata.thing_classes
-        ]
-        labels = _create_text_labels(
-            category_ids, scores, class_names, [x.get("iscrowd", 0) for x in sinfo]
-        )
+        class_names = [name.replace('-other', '').replace('-merged', '') for name in self.metadata.thing_classes]
+        labels = _create_text_labels(category_ids, scores, class_names, [x.get('iscrowd', 0) for x in sinfo])
 
         try:
-            colors = [
-                self._jitter([x / 255 for x in self.metadata.thing_colors[c]])
-                for c in category_ids
-            ]
+            colors = [self._jitter([x / 255 for x in self.metadata.thing_colors[c]]) for c in category_ids]
         except AttributeError:
             colors = None
-        self.overlay_instances(
-            masks=masks, labels=labels, assigned_colors=colors, alpha=alpha
-        )
+        self.overlay_instances(masks=masks, labels=labels, assigned_colors=colors, alpha=alpha)
 
         return self.output
 
@@ -616,42 +566,33 @@ class Visualizer:
         Returns:
             output (VisImage): image object with visualizations.
         """
-        annos = dic.get("annotations", None)
+        annos = dic.get('annotations', None)
         if annos:
-            if "segmentation" in annos[0]:
-                masks = [x["segmentation"] for x in annos]
+            if 'segmentation' in annos[0]:
+                masks = [x['segmentation'] for x in annos]
             else:
                 masks = None
-            if "keypoints" in annos[0]:
-                keypts = [x["keypoints"] for x in annos]
+            if 'keypoints' in annos[0]:
+                keypts = [x['keypoints'] for x in annos]
                 keypts = np.array(keypts).reshape(len(annos), -1, 3)
             else:
                 keypts = None
 
             boxes = [
-                (
-                    BoxMode.convert(x["bbox"], x["bbox_mode"], BoxMode.XYXY_ABS)
-                    if len(x["bbox"]) == 4
-                    else x["bbox"]
-                )
+                (BoxMode.convert(x['bbox'], x['bbox_mode'], BoxMode.XYXY_ABS) if len(x['bbox']) == 4 else x['bbox'])
                 for x in annos
             ]
 
             colors = None
-            category_ids = [x["category_id"] for x in annos]
-            if self._instance_mode == ColorMode.SEGMENTATION and self.metadata.get(
-                "thing_colors"
-            ):
-                colors = [
-                    self._jitter([x / 255 for x in self.metadata.thing_colors[c]])
-                    for c in category_ids
-                ]
-            names = self.metadata.get("thing_classes", None)
+            category_ids = [x['category_id'] for x in annos]
+            if self._instance_mode == ColorMode.SEGMENTATION and self.metadata.get('thing_colors'):
+                colors = [self._jitter([x / 255 for x in self.metadata.thing_colors[c]]) for c in category_ids]
+            names = self.metadata.get('thing_classes', None)
             labels = _create_text_labels(
                 category_ids,
                 scores=None,
                 class_names=names,
-                is_crowd=[x.get("iscrowd", 0) for x in annos],
+                is_crowd=[x.get('iscrowd', 0) for x in annos],
             )
             self.overlay_instances(
                 labels=labels,
@@ -661,17 +602,17 @@ class Visualizer:
                 assigned_colors=colors,
             )
 
-        sem_seg = dic.get("sem_seg", None)
-        if sem_seg is None and "sem_seg_file_name" in dic:
-            with PathManager.open(dic["sem_seg_file_name"], "rb") as f:
+        sem_seg = dic.get('sem_seg', None)
+        if sem_seg is None and 'sem_seg_file_name' in dic:
+            with PathManager.open(dic['sem_seg_file_name'], 'rb') as f:
                 sem_seg = Image.open(f)
-                sem_seg = np.asarray(sem_seg, dtype="uint8")
+                sem_seg = np.asarray(sem_seg, dtype='uint8')
         if sem_seg is not None:
             self.draw_sem_seg(sem_seg, area_threshold=0, alpha=0.4)
 
-        pan_seg = dic.get("pan_seg", None)
-        if pan_seg is None and "pan_seg_file_name" in dic:
-            with PathManager.open(dic["pan_seg_file_name"], "rb") as f:
+        pan_seg = dic.get('pan_seg', None)
+        if pan_seg is None and 'pan_seg_file_name' in dic:
+            with PathManager.open(dic['pan_seg_file_name'], 'rb') as f:
                 pan_seg = Image.open(f)
                 pan_seg = np.asarray(pan_seg)
                 # pyre-fixme[21]: Could not find module `panopticapi.utils`.
@@ -679,7 +620,7 @@ class Visualizer:
 
                 pan_seg = rgb2id(pan_seg)
         if pan_seg is not None:
-            segments_info = dic["segments_info"]
+            segments_info = dic['segments_info']
             pan_seg = torch.tensor(pan_seg)
             self.draw_panoptic_seg(pan_seg, segments_info, area_threshold=0, alpha=0.7)
         return self.output
@@ -694,7 +635,7 @@ class Visualizer:
         assigned_colors=None,
         binary_masks=None,
         alpha=0.5,
-        label_mode="1",
+        label_mode='1',
     ):
         """
         Args:
@@ -743,15 +684,11 @@ class Visualizer:
         if labels is not None:
             assert len(labels) == num_instances
         if assigned_colors is None:
-            assigned_colors = [
-                random_color(rgb=True, maximum=1) for _ in range(num_instances)
-            ]
+            assigned_colors = [random_color(rgb=True, maximum=1) for _ in range(num_instances)]
         if num_instances == 0:
             return labels, [], []
         if boxes is not None and boxes.shape[1] == 5:
-            return self.overlay_rotated_instances(
-                boxes=boxes, labels=labels, assigned_colors=assigned_colors
-            )
+            return self.overlay_rotated_instances(boxes=boxes, labels=labels, assigned_colors=assigned_colors)
 
         # Display in largest to smallest order to reduce occlusion.
         areas = None
@@ -784,14 +721,12 @@ class Visualizer:
                 self.draw_box(boxes[i], alpha=1, edge_color=color)
                 if binary_masks is None:
                     # draw number for non-mask instances
-                    mark = self._draw_number_in_box(
-                        boxes[i], i + 1, color=color, label_mode=label_mode
-                    )
+                    mark = self._draw_number_in_box(boxes[i], i + 1, color=color, label_mode=label_mode)
                     marks.append(mark)
 
             if binary_masks is not None:
                 mark, mask_position = self._draw_number_in_mask(
-                    binary_mask=binary_masks[i].astype("uint8"),
+                    binary_mask=binary_masks[i].astype('uint8'),
                     text=i + 1,
                     color=color,
                     added_positions=added_positions,
@@ -838,9 +773,7 @@ class Visualizer:
         num_instances = len(boxes)
 
         if assigned_colors is None:
-            assigned_colors = [
-                random_color(rgb=True, maximum=1) for _ in range(num_instances)
-            ]
+            assigned_colors = [random_color(rgb=True, maximum=1) for _ in range(num_instances)]
         if num_instances == 0:
             return self.output
 
@@ -877,7 +810,7 @@ class Visualizer:
             output (VisImage): image object with visualizations.
         """
         visible = {}
-        keypoint_names = self.metadata.get("keypoint_names")
+        keypoint_names = self.metadata.get('keypoint_names')
         for idx, keypoint in enumerate(keypoints):
             # draw keypoint
             x, y, prob = keypoint
@@ -887,7 +820,7 @@ class Visualizer:
                     keypoint_name = keypoint_names[idx]
                     visible[keypoint_name] = (x, y)
 
-        if self.metadata.get("keypoint_connection_rules"):
+        if self.metadata.get('keypoint_connection_rules'):
             for kp0, kp1, color in self.metadata.keypoint_connection_rules:
                 if kp0 in visible and kp1 in visible:
                     x0, y0 = visible[kp0]
@@ -899,30 +832,26 @@ class Visualizer:
         # Note that this strategy is specific to person keypoints.
         # For other keypoints, it should just do nothing
         try:
-            ls_x, ls_y = visible["left_shoulder"]
-            rs_x, rs_y = visible["right_shoulder"]
+            ls_x, ls_y = visible['left_shoulder']
+            rs_x, rs_y = visible['right_shoulder']
             mid_shoulder_x, mid_shoulder_y = (ls_x + rs_x) / 2, (ls_y + rs_y) / 2
         except KeyError:
             pass
         else:
             # draw line from nose to mid-shoulder
-            nose_x, nose_y = visible.get("nose", (None, None))
+            nose_x, nose_y = visible.get('nose', (None, None))
             if nose_x is not None:
-                self.draw_line(
-                    [nose_x, mid_shoulder_x], [nose_y, mid_shoulder_y], color=_RED
-                )
+                self.draw_line([nose_x, mid_shoulder_x], [nose_y, mid_shoulder_y], color=_RED)
 
             try:
                 # draw line from mid-shoulder to mid-hip
-                lh_x, lh_y = visible["left_hip"]
-                rh_x, rh_y = visible["right_hip"]
+                lh_x, lh_y = visible['left_hip']
+                rh_x, rh_y = visible['right_hip']
             except KeyError:
                 pass
             else:
                 mid_hip_x, mid_hip_y = (lh_x + rh_x) / 2, (lh_y + rh_y) / 2
-                self.draw_line(
-                    [mid_hip_x, mid_shoulder_x], [mid_hip_y, mid_shoulder_y], color=_RED
-                )
+                self.draw_line([mid_hip_x, mid_shoulder_x], [mid_hip_y, mid_shoulder_y], color=_RED)
         return self.output
 
     def mask_dims_from_binary(self, binary_mask):
@@ -953,11 +882,7 @@ class Visualizer:
 
         x1, y1 = position
 
-        if (
-            mask_width < mask_width_limit
-            and mask_height < mask_height_limit
-            and move_count == 0
-        ):
+        if mask_width < mask_width_limit and mask_height < mask_height_limit and move_count == 0:
             move_x = offset_x if offset_x + x1 < img_width else -offset_x
             move_y = offset_y if offset_y + y1 < img_height else -offset_y
             return (True, move_x, move_y)
@@ -966,18 +891,8 @@ class Visualizer:
             if abs(x1 - x2) + abs(y1 - y2) < location_diff_threshold:
                 move_x = offset_x if x1 >= x2 else -offset_x
                 move_y = offset_y if y1 >= y2 else -offset_y
-                move_x = (
-                    0
-                    if x1 + move_x > img_width - x_boundry_limit
-                    or x1 + move_x < x_boundry_limit
-                    else move_x
-                )
-                move_y = (
-                    0
-                    if y1 + move_y > img_height - y_boundry_limit
-                    or y1 + move_y < y_boundry_limit
-                    else move_y
-                )
+                move_x = 0 if x1 + move_x > img_width - x_boundry_limit or x1 + move_x < x_boundry_limit else move_x
+                move_y = 0 if y1 + move_y > img_height - y_boundry_limit or y1 + move_y < y_boundry_limit else move_y
                 return (
                     True,
                     move_x,
@@ -992,16 +907,12 @@ class Visualizer:
         x, y = original_position
 
         move_count = 0
-        reposition, x_move, y_move = self.reposition_label(
-            (x, y), added_positions, binary_mask, move_count
-        )
+        reposition, x_move, y_move = self.reposition_label((x, y), added_positions, binary_mask, move_count)
         while reposition and move_count < 10:
             x += x_move
             y += y_move
             move_count += 1
-            reposition, x_move, y_move = self.reposition_label(
-                (x, y), added_positions, binary_mask, move_count
-            )
+            reposition, x_move, y_move = self.reposition_label((x, y), added_positions, binary_mask, move_count)
         added_positions.add((x, y))
         return x, y
 
@@ -1017,8 +928,8 @@ class Visualizer:
         binary_mask=None,
         *,
         font_size=None,
-        color="g",
-        horizontal_alignment="center",
+        color='g',
+        horizontal_alignment='center',
         rotation=0,
     ):
         """
@@ -1052,7 +963,7 @@ class Visualizer:
             Y = 0.299 * R + 0.587 * G + 0.114 * B
 
             # If Y value is greater than 128, it's closer to white so return black. Otherwise, return white.
-            return "black" if Y > 128 else "white"
+            return 'black' if Y > 128 else 'white'
 
         bbox_background = contrasting_color(color * 255)
 
@@ -1067,14 +978,14 @@ class Visualizer:
             y,
             text,
             size=font_size * self.output.scale,
-            family="sans-serif",
+            family='sans-serif',
             bbox={
-                "facecolor": bbox_background,
-                "alpha": 0.8,
-                "pad": 0.7,
-                "edgecolor": "none",
+                'facecolor': bbox_background,
+                'alpha': 0.8,
+                'pad': 0.7,
+                'edgecolor': 'none',
             },
-            verticalalignment="top",
+            verticalalignment='top',
             horizontalalignment=horizontal_alignment,
             color=color,
             zorder=10,
@@ -1082,7 +993,7 @@ class Visualizer:
         )
         return self.output
 
-    def draw_box(self, box_coord, alpha=0.5, edge_color="g", line_style="-"):
+    def draw_box(self, box_coord, alpha=0.5, edge_color='g', line_style='-'):
         """
         Args:
             box_coord (tuple): a tuple containing x0, y0, x1, y1 coordinates, where x0 and y0
@@ -1116,9 +1027,7 @@ class Visualizer:
         )
         return self.output
 
-    def draw_rotated_box_with_label(
-        self, rotated_box, alpha=0.5, edge_color="g", line_style="-", label=None
-    ):
+    def draw_rotated_box_with_label(self, rotated_box, alpha=0.5, edge_color='g', line_style='-', label=None):
         """
         Draw a rotated box with label on its top-left corner.
 
@@ -1139,25 +1048,21 @@ class Visualizer:
         cnt_x, cnt_y, w, h, angle = rotated_box
         area = w * h
         # use thinner lines when the box is small
-        linewidth = self._default_font_size / (
-            6 if area < _SMALL_OBJECT_AREA_THRESH * self.output.scale else 3
-        )
+        linewidth = self._default_font_size / (6 if area < _SMALL_OBJECT_AREA_THRESH * self.output.scale else 3)
 
         theta = angle * math.pi / 180.0
         c = math.cos(theta)
         s = math.sin(theta)
         rect = [(-w / 2, h / 2), (-w / 2, -h / 2), (w / 2, -h / 2), (w / 2, h / 2)]
         # x: left->right ; y: top->down
-        rotated_rect = [
-            (s * yy + c * xx + cnt_x, c * yy - s * xx + cnt_y) for (xx, yy) in rect
-        ]
+        rotated_rect = [(s * yy + c * xx + cnt_x, c * yy - s * xx + cnt_y) for (xx, yy) in rect]
         for k in range(4):
             j = (k + 1) % 4
             self.draw_line(
                 [rotated_rect[k][0], rotated_rect[j][0]],
                 [rotated_rect[k][1], rotated_rect[j][1]],
                 color=edge_color,
-                linestyle="--" if k == 1 else line_style,
+                linestyle='--' if k == 1 else line_style,
                 linewidth=linewidth,
             )
 
@@ -1165,17 +1070,9 @@ class Visualizer:
             text_pos = rotated_rect[1]  # topleft corner
 
             height_ratio = h / np.sqrt(self.output.height * self.output.width)
-            label_color = self._change_color_brightness(
-                edge_color, brightness_factor=0.7
-            )
-            font_size = (
-                np.clip((height_ratio - 0.02) / 0.08 + 1, 1.2, 2)
-                * 0.5
-                * self._default_font_size
-            )
-            self.draw_text(
-                label, text_pos, color=label_color, font_size=font_size, rotation=angle
-            )
+            label_color = self._change_color_brightness(edge_color, brightness_factor=0.7)
+            font_size = np.clip((height_ratio - 0.02) / 0.08 + 1, 1.2, 2) * 0.5 * self._default_font_size
+            self.draw_text(label, text_pos, color=label_color, font_size=font_size, rotation=angle)
 
         return self.output
 
@@ -1192,12 +1089,10 @@ class Visualizer:
             output (VisImage): image object with box drawn.
         """
         x, y = circle_coord
-        self.output.ax.add_patch(
-            mpl.patches.Circle(circle_coord, radius=radius, fill=True, color=color)
-        )
+        self.output.ax.add_patch(mpl.patches.Circle(circle_coord, radius=radius, fill=True, color=color))
         return self.output
 
-    def draw_line(self, x_data, y_data, color, linestyle="-", linewidth=None):
+    def draw_line(self, x_data, y_data, color, linestyle='-', linewidth=None):
         """
         Args:
             x_data (list[int]): a list containing x values of all the points being drawn.
@@ -1259,32 +1154,26 @@ class Visualizer:
         color = mplc.to_rgb(color)
 
         has_valid_segment = False
-        binary_mask = binary_mask.astype("uint8")  # opencv needs uint8
+        binary_mask = binary_mask.astype('uint8')  # opencv needs uint8
         mask = GenericMask(binary_mask, self.output.height, self.output.width)
         shape2d = (binary_mask.shape[0], binary_mask.shape[1])
 
         if not mask.has_holes:
             # draw polygons for regular masks
             for segment in mask.polygons:
-                area = mask_util.area(
-                    mask_util.frPyObjects([segment], shape2d[0], shape2d[1])
-                )
+                area = mask_util.area(mask_util.frPyObjects([segment], shape2d[0], shape2d[1]))
                 if area < (area_threshold or 0):
                     continue
                 has_valid_segment = True
                 segment = segment.reshape(-1, 2)
-                self.draw_polygon(
-                    segment, color=color, edge_color=edge_color, alpha=alpha
-                )
+                self.draw_polygon(segment, color=color, edge_color=edge_color, alpha=alpha)
         else:
             # https://stackoverflow.com/questions/8919719/how-to-plot-a-complex-polygon
-            rgba = np.zeros(shape2d + (4,), dtype="float32")
+            rgba = np.zeros(shape2d + (4,), dtype='float32')
             rgba[:, :, :3] = color
-            rgba[:, :, 3] = (mask.mask == 1).astype("float32") * alpha
+            rgba[:, :, 3] = (mask.mask == 1).astype('float32') * alpha
             has_valid_segment = True
-            self.output.ax.imshow(
-                rgba, extent=(0, self.output.width, self.output.height, 0)
-            )
+            self.output.ax.imshow(rgba, extent=(0, self.output.width, self.output.height, 0))
 
         if text is not None and has_valid_segment:
             lighter_color = self._change_color_brightness(color, brightness_factor=0.7)
@@ -1298,9 +1187,9 @@ class Visualizer:
         *,
         edge_color=None,
         text=None,
-        label_mode="1",
+        label_mode='1',
         alpha=0.1,
-        anno_mode=["Mask"],
+        anno_mode=['Mask'],
         area_threshold=10,
     ):
         """
@@ -1325,39 +1214,33 @@ class Visualizer:
         color = mplc.to_rgb(color)
 
         has_valid_segment = True
-        binary_mask = binary_mask.astype("uint8")  # opencv needs uint8
+        binary_mask = binary_mask.astype('uint8')  # opencv needs uint8
         mask = GenericMask(binary_mask, self.output.height, self.output.width)
         shape2d = (binary_mask.shape[0], binary_mask.shape[1])
         bbox = mask.bbox()
 
-        if "Mask" in anno_mode:
+        if 'Mask' in anno_mode:
             if not mask.has_holes:
                 # draw polygons for regular masks
                 for segment in mask.polygons:
-                    area = mask_util.area(
-                        mask_util.frPyObjects([segment], shape2d[0], shape2d[1])
-                    )
+                    area = mask_util.area(mask_util.frPyObjects([segment], shape2d[0], shape2d[1]))
                     if area < (area_threshold or 0):
                         continue
                     has_valid_segment = True
                     segment = segment.reshape(-1, 2)
-                    self.draw_polygon(
-                        segment, color=color, edge_color=edge_color, alpha=alpha
-                    )
+                    self.draw_polygon(segment, color=color, edge_color=edge_color, alpha=alpha)
             else:
                 # https://stackoverflow.com/questions/8919719/how-to-plot-a-complex-polygon
-                rgba = np.zeros(shape2d + (4,), dtype="float32")
+                rgba = np.zeros(shape2d + (4,), dtype='float32')
                 rgba[:, :, :3] = color
-                rgba[:, :, 3] = (mask.mask == 1).astype("float32") * alpha
+                rgba[:, :, 3] = (mask.mask == 1).astype('float32') * alpha
                 has_valid_segment = True
-                self.output.ax.imshow(
-                    rgba, extent=(0, self.output.width, self.output.height, 0)
-                )
+                self.output.ax.imshow(rgba, extent=(0, self.output.width, self.output.height, 0))
 
-        if "Box" in anno_mode:
+        if 'Box' in anno_mode:
             self.draw_box(bbox, edge_color=color, alpha=0.75)
 
-        if "Mark" in anno_mode:
+        if 'Mark' in anno_mode:
             has_valid_segment = True
         else:
             has_valid_segment = False
@@ -1394,16 +1277,14 @@ class Visualizer:
         color = mplc.to_rgb(color)
 
         shape2d = (soft_mask.shape[0], soft_mask.shape[1])
-        rgba = np.zeros(shape2d + (4,), dtype="float32")
+        rgba = np.zeros(shape2d + (4,), dtype='float32')
         rgba[:, :, :3] = color
         rgba[:, :, 3] = soft_mask * alpha
-        self.output.ax.imshow(
-            rgba, extent=(0, self.output.width, self.output.height, 0)
-        )
+        self.output.ax.imshow(rgba, extent=(0, self.output.width, self.output.height, 0))
 
         if text is not None:
             lighter_color = self._change_color_brightness(color, brightness_factor=0.7)
-            binary_mask = (soft_mask > 0.5).astype("uint8")
+            binary_mask = (soft_mask > 0.5).astype('uint8')
             self._draw_text_in_mask(binary_mask, text, lighter_color)
         return self.output
 
@@ -1424,9 +1305,7 @@ class Visualizer:
         if edge_color is None:
             # make edge color darker than the polygon color
             if alpha > 0.8:
-                edge_color = self._change_color_brightness(
-                    color, brightness_factor=-0.7
-                )
+                edge_color = self._change_color_brightness(color, brightness_factor=-0.7)
             else:
                 edge_color = color
         edge_color = mplc.to_rgb(edge_color) + (1,)
@@ -1470,7 +1349,7 @@ class Visualizer:
         Create a grayscale version of the original image.
         The colors in masked area, if given, will be kept.
         """
-        img_bw = self.img.astype("f4").mean(axis=2)
+        img_bw = self.img.astype('f4').mean(axis=2)
         img_bw = np.stack([img_bw] * 3, axis=2)
         if mask is not None:
             img_bw[mask] = self.img[mask]
@@ -1498,9 +1377,7 @@ class Visualizer:
         modified_lightness = polygon_color[1] + (brightness_factor * polygon_color[1])
         modified_lightness = 0.0 if modified_lightness < 0.0 else modified_lightness
         modified_lightness = 1.0 if modified_lightness > 1.0 else modified_lightness
-        modified_color = colorsys.hls_to_rgb(
-            polygon_color[0], modified_lightness, polygon_color[2]
-        )
+        modified_color = colorsys.hls_to_rgb(polygon_color[0], modified_lightness, polygon_color[2])
         return modified_color
 
     def _convert_boxes(self, boxes):
@@ -1535,19 +1412,16 @@ class Visualizer:
                 ret.append(GenericMask(x, self.output.height, self.output.width))
         return ret
 
-    def _draw_number_in_box(self, box, text, color, label_mode="1"):
+    def _draw_number_in_box(self, box, text, color, label_mode='1'):
         """
         Find proper places to draw text given a box.
         """
         x0, y0, x1, y1 = box
         text_pos = (x0, y0)  # if drawing boxes, put text on the box corner.
-        horiz_align = "left"
+        horiz_align = 'left'
         # for small objects, draw text at the side to avoid occlusion
         instance_area = (y1 - y0) * (x1 - x0)
-        if (
-            instance_area < _SMALL_OBJECT_AREA_THRESH * self.output.scale
-            or y1 - y0 < 40 * self.output.scale
-        ):
+        if instance_area < _SMALL_OBJECT_AREA_THRESH * self.output.scale or y1 - y0 < 40 * self.output.scale:
             if y1 >= self.output.height - 5:
                 text_pos = (x1, y0)
             else:
@@ -1555,12 +1429,8 @@ class Visualizer:
 
         height_ratio = (y1 - y0) / np.sqrt(self.output.height * self.output.width)
         lighter_color = self._change_color_brightness(color, brightness_factor=0.7)
-        font_size = (
-            np.clip((height_ratio - 0.02) / 0.08 + 1, 1.2, 2)
-            * 0.65
-            * self._default_font_size
-        )
-        if label_mode == "a":
+        font_size = np.clip((height_ratio - 0.02) / 0.08 + 1, 1.2, 2) * 0.65 * self._default_font_size
+        if label_mode == 'a':
             text = self.number_to_string(int(text))
         else:
             text = text
@@ -1580,21 +1450,19 @@ class Visualizer:
         while n:
             n, remainder = divmod(n - 1, 26)
             chars.append(chr(97 + remainder))
-        return "".join(reversed(chars))
+        return ''.join(reversed(chars))
 
-    def _draw_number_in_mask(
-        self, binary_mask, text, color, added_positions=None, label_mode="1"
-    ):
+    def _draw_number_in_mask(self, binary_mask, text, color, added_positions=None, label_mode='1'):
         """
         Find proper places to draw text given a binary mask.
         """
-        binary_mask = np.pad(binary_mask, ((1, 1), (1, 1)), "constant")
+        binary_mask = np.pad(binary_mask, ((1, 1), (1, 1)), 'constant')
         mask_dt = cv2.distanceTransform(binary_mask, cv2.DIST_L2, 0)
         mask_dt = mask_dt[1:-1, 1:-1]
         max_dist = np.max(mask_dt)
         coords_y, coords_x = np.where(mask_dt == max_dist)  # coords is [y, x]
 
-        if label_mode == "a":
+        if label_mode == 'a':
             text = self.number_to_string(int(text))
         else:
             text = text
@@ -1632,9 +1500,7 @@ class Visualizer:
         """
         Find proper places to draw text given a binary mask.
         """
-        _num_cc, cc_labels, stats, centroids = cv2.connectedComponentsWithStats(
-            binary_mask, 8
-        )
+        _num_cc, cc_labels, stats, centroids = cv2.connectedComponentsWithStats(binary_mask, 8)
         if stats[1:, -1].size == 0:
             return
         largest_component_id = np.argmax(stats[1:, -1]) + 1

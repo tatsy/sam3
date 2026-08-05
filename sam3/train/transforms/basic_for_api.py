@@ -61,8 +61,8 @@ def crop(
         else:
             if recompute_box_from_mask and obj.segment is None and obj.area > 0:
                 logging.warning(
-                    "Cannot recompute bounding box from mask since `obj.segment` is None. "
-                    "Falling back to directly cropping from the input bounding box."
+                    'Cannot recompute bounding box from mask since `obj.segment` is None. '
+                    'Falling back to directly cropping from the input bounding box.'
                 )
             boxes = obj.bbox.view(1, 4)
             max_size = torch.as_tensor([w, h], dtype=torch.float32)
@@ -74,9 +74,7 @@ def crop(
 
     for query in datapoint.find_queries:
         if query.semantic_target is not None:
-            query.semantic_target = F.crop(
-                query.semantic_target, int(i), int(j), int(h), int(w)
-            )
+            query.semantic_target = F.crop(query.semantic_target, int(i), int(j), int(h), int(w))
         if query.image_id == index and query.input_bbox is not None:
             boxes = query.input_bbox
             max_size = torch.as_tensor([w, h], dtype=torch.float32)
@@ -92,9 +90,7 @@ def crop(
 
             query.input_bbox = cropped_boxes.reshape(-1, 4)
         if query.image_id == index and query.input_points is not None:
-            print(
-                "Warning! Point cropping with this function may lead to unexpected results"
-            )
+            print('Warning! Point cropping with this function may lead to unexpected results')
             points = query.input_points
             # Unlike right-lower box edges, which are exclusive, the
             # point must be in [0, length-1], hence the -1
@@ -107,7 +103,7 @@ def crop(
     if check_validity:
         # Check that all boxes are still valid
         for obj in datapoint.images[index].objects:
-            assert obj.area > 0, "Box {} has no area".format(obj.bbox)
+            assert obj.area > 0, 'Box {} has no area'.format(obj.bbox)
 
     return datapoint
 
@@ -118,9 +114,7 @@ def hflip(datapoint, index):
     w, h = datapoint.images[index].data.size
     for obj in datapoint.images[index].objects:
         boxes = obj.bbox.view(1, 4)
-        boxes = boxes[:, [2, 1, 0, 3]] * torch.as_tensor(
-            [-1, 1, -1, 1]
-        ) + torch.as_tensor([w, 0, w, 0])
+        boxes = boxes[:, [2, 1, 0, 3]] * torch.as_tensor([-1, 1, -1, 1]) + torch.as_tensor([w, 0, w, 0])
         obj.bbox = boxes
         if obj.segment is not None:
             obj.segment = F.hflip(obj.segment)
@@ -130,9 +124,7 @@ def hflip(datapoint, index):
             query.semantic_target = F.hflip(query.semantic_target)
         if query.image_id == index and query.input_bbox is not None:
             boxes = query.input_bbox
-            boxes = boxes[:, [2, 1, 0, 3]] * torch.as_tensor(
-                [-1, 1, -1, 1]
-            ) + torch.as_tensor([w, 0, w, 0])
+            boxes = boxes[:, [2, 1, 0, 3]] * torch.as_tensor([-1, 1, -1, 1]) + torch.as_tensor([w, 0, w, 0])
             query.input_bbox = boxes
         if query.image_id == index and query.input_points is not None:
             points = query.input_points
@@ -174,30 +166,16 @@ def resize(datapoint, index, size, max_size=None, square=False, v2=False):
     if square:
         size = size, size
     else:
-        cur_size = (
-            datapoint.images[index].data.size()[-2:][::-1]
-            if v2
-            else datapoint.images[index].data.size
-        )
+        cur_size = datapoint.images[index].data.size()[-2:][::-1] if v2 else datapoint.images[index].data.size
         size = get_size(cur_size, size, max_size)
 
-    old_size = (
-        datapoint.images[index].data.size()[-2:][::-1]
-        if v2
-        else datapoint.images[index].data.size
-    )
+    old_size = datapoint.images[index].data.size()[-2:][::-1] if v2 else datapoint.images[index].data.size
     if v2:
-        datapoint.images[index].data = Fv2.resize(
-            datapoint.images[index].data, size, antialias=True
-        )
+        datapoint.images[index].data = Fv2.resize(datapoint.images[index].data, size, antialias=True)
     else:
         datapoint.images[index].data = F.resize(datapoint.images[index].data, size)
 
-    new_size = (
-        datapoint.images[index].data.size()[-2:][::-1]
-        if v2
-        else datapoint.images[index].data.size
-    )
+    new_size = datapoint.images[index].data.size()[-2:][::-1] if v2 else datapoint.images[index].data.size
     ratios = tuple(float(s) / float(s_orig) for s, s_orig in zip(new_size, old_size))
     ratio_width, ratio_height = ratios
 
@@ -213,9 +191,7 @@ def resize(datapoint, index, size, max_size=None, square=False, v2=False):
 
     for query in datapoint.find_queries:
         if query.semantic_target is not None:
-            query.semantic_target = F.resize(
-                query.semantic_target[None, None], size
-            ).squeeze()
+            query.semantic_target = F.resize(query.semantic_target[None, None], size).squeeze()
         if query.image_id == index and query.input_bbox is not None:
             boxes = query.input_bbox
             scaled_boxes = boxes * torch.as_tensor(
@@ -242,13 +218,9 @@ def pad(datapoint, index, padding, v2=False):
     if len(padding) == 2:
         # assumes that we only pad on the bottom right corners
         if v2:
-            datapoint.images[index].data = Fv2.pad(
-                datapoint.images[index].data, (0, 0, padding[0], padding[1])
-            )
+            datapoint.images[index].data = Fv2.pad(datapoint.images[index].data, (0, 0, padding[0], padding[1]))
         else:
-            datapoint.images[index].data = F.pad(
-                datapoint.images[index].data, (0, 0, padding[0], padding[1])
-            )
+            datapoint.images[index].data = F.pad(datapoint.images[index].data, (0, 0, padding[0], padding[1]))
         h += padding[1]
         w += padding[0]
     else:
@@ -271,15 +243,11 @@ def pad(datapoint, index, padding, v2=False):
 
     for obj in datapoint.images[index].objects:
         if len(padding) != 2:
-            obj.bbox += torch.as_tensor(
-                [padding[0], padding[1], padding[0], padding[1]], dtype=torch.float32
-            )
+            obj.bbox += torch.as_tensor([padding[0], padding[1], padding[0], padding[1]], dtype=torch.float32)
         if obj.segment is not None:
             if v2:
                 if len(padding) == 2:
-                    obj.segment = Fv2.pad(
-                        obj.segment[None], (0, 0, padding[0], padding[1])
-                    ).squeeze(0)
+                    obj.segment = Fv2.pad(obj.segment[None], (0, 0, padding[0], padding[1])).squeeze(0)
                 else:
                     obj.segment = Fv2.pad(obj.segment[None], tuple(padding)).squeeze(0)
             else:
@@ -297,9 +265,7 @@ def pad(datapoint, index, padding, v2=False):
                         (0, 0, padding[0], padding[1]),
                     ).squeeze()
                 else:
-                    query.semantic_target = Fv2.pad(
-                        query.semantic_target[None, None], tuple(padding)
-                    ).squeeze()
+                    query.semantic_target = Fv2.pad(query.semantic_target[None, None], tuple(padding)).squeeze()
             else:
                 if len(padding) == 2:
                     query.semantic_target = F.pad(
@@ -307,9 +273,7 @@ def pad(datapoint, index, padding, v2=False):
                         (0, 0, padding[0], padding[1]),
                     ).squeeze()
                 else:
-                    query.semantic_target = F.pad(
-                        query.semantic_target[None, None], tuple(padding)
-                    ).squeeze()
+                    query.semantic_target = F.pad(query.semantic_target[None, None], tuple(padding)).squeeze()
         if query.image_id == index and query.input_bbox is not None:
             if len(padding) != 2:
                 query.input_bbox += torch.as_tensor(
@@ -318,9 +282,7 @@ def pad(datapoint, index, padding, v2=False):
                 )
         if query.image_id == index and query.input_points is not None:
             if len(padding) != 2:
-                query.input_points += torch.as_tensor(
-                    [padding[0], padding[1], 0], dtype=torch.float32
-                )
+                query.input_points += torch.as_tensor([padding[0], padding[1], 0], dtype=torch.float32)
 
     return datapoint
 
@@ -371,16 +333,8 @@ class RandomSizeCropAPI:
 
         # The crop box must extend one pixel beyond points to the bottom/right
         # to assure the exclusive box contains the points.
-        minX = (
-            torch.cat([boxes[:, 0] + min_box_size, points[:, 0] + 1], dim=0)
-            .max()
-            .item()
-        )
-        minY = (
-            torch.cat([boxes[:, 1] + min_box_size, points[:, 1] + 1], dim=0)
-            .max()
-            .item()
-        )
+        minX = torch.cat([boxes[:, 0] + min_box_size, points[:, 0] + 1], dim=0).max().item()
+        minY = torch.cat([boxes[:, 1] + min_box_size, points[:, 1] + 1], dim=0).max().item()
         minX = min(img_width, minX)
         minY = min(img_height, minY)
         maxX = torch.cat([boxes[:, 2] - min_box_size, points[:, 0]], dim=0).min().item()
@@ -395,16 +349,12 @@ class RandomSizeCropAPI:
             # i = random.uniform(max(0, minX - w + 1), max(maxX, max(0, minX - w + 1)))
             i = random.uniform(max(0, minX - w), max(maxX, max(0, minX - w)))
         else:
-            i = random.uniform(
-                max(0, minX - w + 1), max(maxX - 1, max(0, minX - w + 1))
-            )
+            i = random.uniform(max(0, minX - w + 1), max(maxX - 1, max(0, minX - w + 1)))
         if minY > maxY:
             # j = random.uniform(max(0, minY - h + 1), max(maxY, max(0, minY - h + 1)))
             j = random.uniform(max(0, minY - h), max(maxY, max(0, minY - h)))
         else:
-            j = random.uniform(
-                max(0, minY - h + 1), max(maxY - 1, max(0, minY - h + 1))
-            )
+            j = random.uniform(max(0, minY - h + 1), max(maxY - 1, max(0, minY - h + 1)))
 
         return [j, i, h, w]
 
@@ -419,36 +369,24 @@ class RandomSizeCropAPI:
                 all_boxes = []
                 # Getting all boxes in all the images
                 if self.respect_boxes:
-                    all_boxes += [
-                        obj.bbox.view(-1, 4)
-                        for img in datapoint.images
-                        for obj in img.objects
-                    ]
+                    all_boxes += [obj.bbox.view(-1, 4) for img in datapoint.images for obj in img.objects]
                 # Get all the boxes in the find queries
                 if self.respect_input_boxes:
-                    all_boxes += [
-                        q.input_bbox.view(-1, 4)
-                        for q in datapoint.find_queries
-                        if q.input_bbox is not None
-                    ]
+                    all_boxes += [q.input_bbox.view(-1, 4) for q in datapoint.find_queries if q.input_bbox is not None]
                 if all_boxes:
                     all_boxes = torch.cat(all_boxes, 0)
                 else:
                     all_boxes = torch.empty(0, 4)
 
                 all_points = [
-                    q.input_points.view(-1, 3)[:, :2]
-                    for q in datapoint.find_queries
-                    if q.input_points is not None
+                    q.input_points.view(-1, 3)[:, :2] for q in datapoint.find_queries if q.input_points is not None
                 ]
                 if all_points:
                     all_points = torch.cat(all_points, 0)
                 else:
                     all_points = torch.empty(0, 2)
 
-                crop_param = self._sample_respect_boxes(
-                    datapoint.images[0].data, all_boxes, all_points
-                )
+                crop_param = self._sample_respect_boxes(datapoint.images[0].data, all_boxes, all_points)
                 for i in range(len(datapoint.images)):
                     datapoint = crop(
                         datapoint,
@@ -465,9 +403,7 @@ class RandomSizeCropAPI:
                     all_boxes = []
                     # Get all boxes in the current image
                     if self.respect_boxes:
-                        all_boxes += [
-                            obj.bbox.view(-1, 4) for obj in datapoint.images[i].objects
-                        ]
+                        all_boxes += [obj.bbox.view(-1, 4) for obj in datapoint.images[i].objects]
                     # Get all the boxes in the find queries that correspond to this image
                     if self.respect_input_boxes:
                         all_boxes += [
@@ -481,18 +417,14 @@ class RandomSizeCropAPI:
                         all_boxes = torch.empty(0, 4)
 
                     all_points = [
-                        q.input_points.view(-1, 3)[:, :2]
-                        for q in datapoint.find_queries
-                        if q.input_points is not None
+                        q.input_points.view(-1, 3)[:, :2] for q in datapoint.find_queries if q.input_points is not None
                     ]
                     if all_points:
                         all_points = torch.cat(all_points, 0)
                     else:
                         all_points = torch.empty(0, 2)
 
-                    crop_param = self._sample_respect_boxes(
-                        datapoint.images[i].data, all_boxes, all_points
-                    )
+                    crop_param = self._sample_respect_boxes(datapoint.images[i].data, all_boxes, all_points)
                     datapoint = crop(
                         datapoint,
                         i,
@@ -597,9 +529,7 @@ class RandomHorizontalFlip:
 
 
 class RandomResizeAPI:
-    def __init__(
-        self, sizes, consistent_transform, max_size=None, square=False, v2=False
-    ):
+    def __init__(self, sizes, consistent_transform, max_size=None, square=False, v2=False):
         if isinstance(sizes, int):
             sizes = (sizes,)
         assert isinstance(sizes, Iterable)
@@ -613,15 +543,11 @@ class RandomResizeAPI:
         if self.consistent_transform:
             size = random.choice(self.sizes)
             for i in range(len(datapoint.images)):
-                datapoint = resize(
-                    datapoint, i, size, self.max_size, square=self.square, v2=self.v2
-                )
+                datapoint = resize(datapoint, i, size, self.max_size, square=self.square, v2=self.v2)
             return datapoint
         for i in range(len(datapoint.images)):
             size = random.choice(self.sizes)
-            datapoint = resize(
-                datapoint, i, size, self.max_size, square=self.square, v2=self.v2
-            )
+            datapoint = resize(datapoint, i, size, self.max_size, square=self.square, v2=self.v2)
         return datapoint
 
 
@@ -630,13 +556,13 @@ class ScheduledRandomResizeAPI(RandomResizeAPI):
         self.size_scheduler = size_scheduler
         # Just a meaningful init value for super
         params = self.size_scheduler(epoch_num=0)
-        sizes, max_size = params["sizes"], params["max_size"]
+        sizes, max_size = params['sizes'], params['max_size']
         super().__init__(sizes, consistent_transform, max_size=max_size, square=square)
 
     def __call__(self, datapoint, **kwargs):
-        assert "epoch" in kwargs, "Param scheduler needs to know the current epoch"
-        params = self.size_scheduler(kwargs["epoch"])
-        sizes, max_size = params["sizes"], params["max_size"]
+        assert 'epoch' in kwargs, 'Param scheduler needs to know the current epoch'
+        params = self.size_scheduler(kwargs['epoch'])
+        sizes, max_size = params['sizes'], params['max_size']
         self.sizes = sizes
         self.max_size = max_size
         datapoint = super(ScheduledRandomResizeAPI, self).__call__(datapoint, **kwargs)
@@ -759,7 +685,7 @@ def random_mosaic_frame(
     if is_pil:
         H_im = image_data.height
         W_im = image_data.width
-        image_data_output = PILImage.new("RGB", (W_im, H_im))
+        image_data_output = PILImage.new('RGB', (W_im, H_im))
     else:
         H_im = image_data.size(-2)
         W_im = image_data.size(-1)
@@ -791,9 +717,7 @@ def random_mosaic_frame(
             if is_pil:
                 image_data_output.paste(image_data_downsize, (x_offset_b, y_offset_b))
             else:
-                image_data_output[:, y_offset_b:y_offset_e, x_offset_b:x_offset_e] = (
-                    image_data_downsize
-                )
+                image_data_output[:, y_offset_b:y_offset_e, x_offset_b:x_offset_e] = image_data_downsize
 
     datapoint.images[index].data = image_data_output
 
@@ -821,9 +745,7 @@ def random_mosaic_frame(
         if should_hflip[target_grid_y, target_grid_x].item():
             segment_downsize = F.hflip(segment_downsize[None, None])[0, 0]
 
-        segment_output[
-            target_y_offset_b:target_y_offset_e, target_x_offset_b:target_x_offset_e
-        ] = segment_downsize
+        segment_output[target_y_offset_b:target_y_offset_e, target_x_offset_b:target_x_offset_e] = segment_downsize
         obj.segment = segment_output
 
     return datapoint
@@ -832,13 +754,13 @@ def random_mosaic_frame(
 class ScheduledPadToSizeAPI(PadToSizeAPI):
     def __init__(self, size_scheduler, consistent_transform):
         self.size_scheduler = size_scheduler
-        size = self.size_scheduler(epoch_num=0)["sizes"]
+        size = self.size_scheduler(epoch_num=0)['sizes']
         super().__init__(size, consistent_transform)
 
     def __call__(self, datapoint, **kwargs):
-        assert "epoch" in kwargs, "Param scheduler needs to know the current epoch"
-        params = self.size_scheduler(kwargs["epoch"])
-        self.size = params["resolution"]
+        assert 'epoch' in kwargs, 'Param scheduler needs to know the current epoch'
+        params = self.size_scheduler(kwargs['epoch'])
+        self.size = params['resolution']
         return super(ScheduledPadToSizeAPI, self).__call__(datapoint, **kwargs)
 
 
@@ -900,9 +822,7 @@ class NormalizeAPI:
                 boxes = obj.bbox
                 cur_h, cur_w = img.data.shape[-2:]
                 boxes = box_xyxy_to_cxcywh(boxes)
-                boxes = boxes / torch.tensor(
-                    [cur_w, cur_h, cur_w, cur_h], dtype=torch.float32
-                )
+                boxes = boxes / torch.tensor([cur_w, cur_h, cur_w, cur_h], dtype=torch.float32)
                 obj.bbox = boxes
 
         for query in datapoint.find_queries:
@@ -911,9 +831,7 @@ class NormalizeAPI:
                 # pyrefly: ignore [missing-attribute]
                 cur_h, cur_w = datapoint.images[query.image_id].data.shape[-2:]
                 boxes = box_xyxy_to_cxcywh(boxes)
-                boxes = boxes / torch.tensor(
-                    [cur_w, cur_h, cur_w, cur_h], dtype=torch.float32
-                )
+                boxes = boxes / torch.tensor([cur_w, cur_h, cur_w, cur_h], dtype=torch.float32)
                 query.input_bbox = boxes
             if query.input_points is not None:
                 points = query.input_points
@@ -935,11 +853,11 @@ class ComposeAPI:
         return datapoint
 
     def __repr__(self):
-        format_string = self.__class__.__name__ + "("
+        format_string = self.__class__.__name__ + '('
         for t in self.transforms:
-            format_string += "\n"
-            format_string += "    {0}".format(t)
-        format_string += "\n)"
+            format_string += '\n'
+            format_string += '    {0}'.format(t)
+        format_string += '\n)'
         return format_string
 
 
@@ -964,21 +882,9 @@ class RandomGrayscale:
 class ColorJitter:
     def __init__(self, consistent_transform, brightness, contrast, saturation, hue):
         self.consistent_transform = consistent_transform
-        self.brightness = (
-            brightness
-            if isinstance(brightness, list)
-            else [max(0, 1 - brightness), 1 + brightness]
-        )
-        self.contrast = (
-            contrast
-            if isinstance(contrast, list)
-            else [max(0, 1 - contrast), 1 + contrast]
-        )
-        self.saturation = (
-            saturation
-            if isinstance(saturation, list)
-            else [max(0, 1 - saturation), 1 + saturation]
-        )
+        self.brightness = brightness if isinstance(brightness, list) else [max(0, 1 - brightness), 1 + brightness]
+        self.contrast = contrast if isinstance(contrast, list) else [max(0, 1 - contrast), 1 + contrast]
+        self.saturation = saturation if isinstance(saturation, list) else [max(0, 1 - saturation), 1 + saturation]
         self.hue = hue if isinstance(hue, list) or hue is None else ([-hue, hue])
 
     def __call__(self, datapoint: Datapoint, **kwargs):
@@ -990,9 +896,7 @@ class ColorJitter:
                 contrast_factor,
                 saturation_factor,
                 hue_factor,
-            ) = T.ColorJitter.get_params(
-                self.brightness, self.contrast, self.saturation, self.hue
-            )
+            ) = T.ColorJitter.get_params(self.brightness, self.contrast, self.saturation, self.hue)
         for img in datapoint.images:
             if not self.consistent_transform:
                 (
@@ -1001,9 +905,7 @@ class ColorJitter:
                     contrast_factor,
                     saturation_factor,
                     hue_factor,
-                ) = T.ColorJitter.get_params(
-                    self.brightness, self.contrast, self.saturation, self.hue
-                )
+                ) = T.ColorJitter.get_params(self.brightness, self.contrast, self.saturation, self.hue)
             # pyrefly: ignore [unbound-name]
             for fn_id in fn_idx:
                 # pyrefly: ignore [unbound-name]
@@ -1036,7 +938,7 @@ class RandomAffine:
         image_mean=(123, 116, 103),
         log_warning=True,
         num_tentatives=1,
-        image_interpolation="bicubic",
+        image_interpolation='bicubic',
     ):
         """
         The mask is required for this transform.
@@ -1044,18 +946,16 @@ class RandomAffine:
         """
         self.degrees = degrees if isinstance(degrees, list) else ([-degrees, degrees])
         self.scale = scale
-        self.shear = (
-            shear if isinstance(shear, list) else ([-shear, shear] if shear else None)
-        )
+        self.shear = shear if isinstance(shear, list) else ([-shear, shear] if shear else None)
         self.translate = translate
         self.fill_img = image_mean
         self.consistent_transform = consistent_transform
         self.log_warning = log_warning
         self.num_tentatives = num_tentatives
 
-        if image_interpolation == "bicubic":
+        if image_interpolation == 'bicubic':
             self.image_interpolation = InterpolationMode.BICUBIC
-        elif image_interpolation == "bilinear":
+        elif image_interpolation == 'bilinear':
             self.image_interpolation = InterpolationMode.BILINEAR
         else:
             raise NotImplementedError
@@ -1068,7 +968,7 @@ class RandomAffine:
 
         if self.log_warning:
             logging.warning(
-                f"Skip RandomAffine for zero-area mask in first frame after {self.num_tentatives} tentatives"
+                f'Skip RandomAffine for zero-area mask in first frame after {self.num_tentatives} tentatives'
             )
         return datapoint
 
@@ -1162,7 +1062,7 @@ class RandomResizedCrop:
         elif isinstance(size, Sequence) and len(size) == 1:
             self.size = (size[0], size[0])
         elif len(size) != 2:
-            raise ValueError("Please provide only two dimensions (h, w) for size.")
+            raise ValueError('Please provide only two dimensions (h, w) for size.')
         else:
             self.size = size
 
@@ -1181,7 +1081,7 @@ class RandomResizedCrop:
 
         if self.log_warning:
             logging.warning(
-                f"Skip RandomResizeCrop for zero-area mask in first frame after {self.num_tentatives} tentatives"
+                f'Skip RandomResizeCrop for zero-area mask in first frame after {self.num_tentatives} tentatives'
             )
         return datapoint
 
@@ -1320,7 +1220,7 @@ def get_bbox_xyxy_abs_coords_from_mask(mask):
 
 class MotionBlur:
     def __init__(self, kernel_size=5, consistent_transform=True, p=0.5):
-        assert kernel_size % 2 == 1, "Kernel size must be odd."
+        assert kernel_size % 2 == 1, 'Kernel size must be odd.'
         self.kernel_size = kernel_size
         self.consistent_transform = consistent_transform
         self.p = p
@@ -1342,12 +1242,12 @@ class MotionBlur:
 
     def _generate_motion_blur_kernel(self):
         kernel = torch.zeros((self.kernel_size, self.kernel_size))
-        direction = random.choice(["horizontal", "vertical", "diagonal"])
-        if direction == "horizontal":
+        direction = random.choice(['horizontal', 'vertical', 'diagonal'])
+        if direction == 'horizontal':
             kernel[self.kernel_size // 2, :] = 1.0
-        elif direction == "vertical":
+        elif direction == 'vertical':
             kernel[:, self.kernel_size // 2] = 1.0
-        elif direction == "diagonal":
+        elif direction == 'diagonal':
             for i in range(self.kernel_size):
                 kernel[i, i] = 1.0
         kernel /= kernel.sum()

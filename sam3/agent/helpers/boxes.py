@@ -45,9 +45,7 @@ class BoxMode(IntEnum):
     """
 
     @staticmethod
-    def convert(
-        box: _RawBoxType, from_mode: "BoxMode", to_mode: "BoxMode"
-    ) -> _RawBoxType:
+    def convert(box: _RawBoxType, from_mode: 'BoxMode', to_mode: 'BoxMode') -> _RawBoxType:
         """
         Args:
             box: can be a k-tuple, k-list or an Nxk array/tensor, where k = 4 or 5
@@ -64,8 +62,7 @@ class BoxMode(IntEnum):
         single_box = isinstance(box, (list, tuple))
         if single_box:
             assert len(box) == 4 or len(box) == 5, (
-                "BoxMode.convert takes either a k-tuple/list or an Nxk array/tensor,"
-                " where k == 4 or 5"
+                'BoxMode.convert takes either a k-tuple/list or an Nxk array/tensor, where k == 4 or 5'
             )
             arr = torch.tensor(box)[None, :]
         else:
@@ -83,12 +80,10 @@ class BoxMode(IntEnum):
         ] and from_mode not in [
             BoxMode.XYXY_REL,
             BoxMode.XYWH_REL,
-        ], "Relative mode not yet supported!"
+        ], 'Relative mode not yet supported!'
 
         if from_mode == BoxMode.XYWHA_ABS and to_mode == BoxMode.XYXY_ABS:
-            assert arr.shape[-1] == 5, (
-                "The last dimension of input shape must be 5 for XYWHA format"
-            )
+            assert arr.shape[-1] == 5, 'The last dimension of input shape must be 5 for XYWHA format'
             original_dtype = arr.dtype
             arr = arr.double()
 
@@ -126,9 +121,7 @@ class BoxMode(IntEnum):
                 arr[:, 3] -= arr[:, 1]
             else:
                 raise NotImplementedError(
-                    "Conversion from BoxMode {} to {} is not supported yet".format(
-                        from_mode, to_mode
-                    )
+                    'Conversion from BoxMode {} to {} is not supported yet'.format(from_mode, to_mode)
                 )
 
         if single_box:
@@ -158,9 +151,7 @@ class Boxes:
             tensor (Tensor[float]): a Nx4 matrix.  Each row is (x1, y1, x2, y2).
         """
         if not isinstance(tensor, torch.Tensor):
-            tensor = torch.as_tensor(
-                tensor, dtype=torch.float32, device=torch.device("cpu")
-            )
+            tensor = torch.as_tensor(tensor, dtype=torch.float32, device=torch.device('cpu'))
         else:
             tensor = tensor.to(torch.float32)
         if tensor.numel() == 0:
@@ -171,7 +162,7 @@ class Boxes:
 
         self.tensor = tensor
 
-    def clone(self) -> "Boxes":
+    def clone(self) -> 'Boxes':
         """
         Clone the Boxes.
 
@@ -203,7 +194,7 @@ class Boxes:
         Args:
             box_size (height, width): The clipping box's size.
         """
-        assert torch.isfinite(self.tensor).all(), "Box tensor contains infinite or NaN!"
+        assert torch.isfinite(self.tensor).all(), 'Box tensor contains infinite or NaN!'
         h, w = box_size
         x1 = self.tensor[:, 0].clamp(min=0, max=w)
         y1 = self.tensor[:, 1].clamp(min=0, max=h)
@@ -227,7 +218,7 @@ class Boxes:
         keep = (widths > threshold) & (heights > threshold)
         return keep
 
-    def __getitem__(self, item) -> "Boxes":
+    def __getitem__(self, item) -> 'Boxes':
         """
         Args:
             item: int, slice, or a BoolTensor
@@ -248,20 +239,16 @@ class Boxes:
         if isinstance(item, int):
             return Boxes(self.tensor[item].view(1, -1))
         b = self.tensor[item]
-        assert b.dim() == 2, (
-            "Indexing on Boxes with {} failed to return a matrix!".format(item)
-        )
+        assert b.dim() == 2, 'Indexing on Boxes with {} failed to return a matrix!'.format(item)
         return Boxes(b)
 
     def __len__(self) -> int:
         return self.tensor.shape[0]
 
     def __repr__(self) -> str:
-        return "Boxes(" + str(self.tensor) + ")"
+        return 'Boxes(' + str(self.tensor) + ')'
 
-    def inside_box(
-        self, box_size: Tuple[int, int], boundary_threshold: int = 0
-    ) -> torch.Tensor:
+    def inside_box(self, box_size: Tuple[int, int], boundary_threshold: int = 0) -> torch.Tensor:
         """
         Args:
             box_size (height, width): Size of the reference box.
@@ -295,7 +282,7 @@ class Boxes:
         self.tensor[:, 1::2] *= scale_y
 
     @classmethod
-    def cat(cls, boxes_list: List["Boxes"]) -> "Boxes":
+    def cat(cls, boxes_list: List['Boxes']) -> 'Boxes':
         """
         Concatenates a list of Boxes into a single Boxes
 
@@ -399,9 +386,7 @@ def pairwise_ioa(boxes1: Boxes, boxes2: Boxes) -> torch.Tensor:
     inter = pairwise_intersection(boxes1, boxes2)
 
     # handle empty boxes
-    ioa = torch.where(
-        inter > 0, inter / area2, torch.zeros(1, dtype=inter.dtype, device=inter.device)
-    )
+    ioa = torch.where(inter > 0, inter / area2, torch.zeros(1, dtype=inter.dtype, device=inter.device))
     return ioa
 
 
@@ -436,10 +421,8 @@ def matched_pairwise_iou(boxes1: Boxes, boxes2: Boxes) -> torch.Tensor:
     Returns:
         Tensor: iou, sized [N].
     """
-    assert len(boxes1) == len(boxes2), (
-        "boxlists should have the samenumber of entries, got {}, {}".format(
-            len(boxes1), len(boxes2)
-        )
+    assert len(boxes1) == len(boxes2), 'boxlists should have the samenumber of entries, got {}, {}'.format(
+        len(boxes1), len(boxes2)
     )
     area1 = boxes1.area()  # [N]
     area2 = boxes2.area()  # [N]
