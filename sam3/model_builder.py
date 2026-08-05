@@ -3,13 +3,14 @@
 # pyre-unsafe
 
 import os
+from importlib.resources import files
 from typing import Optional
 
-import pkg_resources
 import torch
 import torch.nn as nn
 from huggingface_hub import hf_hub_download
 from iopath.common.file_io import g_pathmgr
+
 from sam3.model.decoder import (
     DecoupledTransformerDecoderLayerv2,
     SimpleRoPEAttention,
@@ -29,11 +30,11 @@ from sam3.model.memory import (
     SimpleMaskEncoder,
 )
 from sam3.model.model_misc import (
-    DotProductScoring,
     MLP,
-    MultiheadAttentionWrapper as MultiheadAttention,
+    DotProductScoring,
     TransformerWrapper,
 )
+from sam3.model.model_misc import MultiheadAttentionWrapper as MultiheadAttention
 from sam3.model.multiplex_utils import MultiplexController
 from sam3.model.necks import Sam3DualViTDetNeck, Sam3TriViTDetNeck
 from sam3.model.position_encoding import PositionEmbeddingSine
@@ -596,9 +597,7 @@ def build_sam3_image_model(
         A SAM3 image model
     """
     if bpe_path is None:
-        bpe_path = pkg_resources.resource_filename(
-            "sam3", "assets/bpe_simple_vocab_16e6.txt.gz"
-        )
+        bpe_path = str(files("sam3").joinpath("assets/bpe_simple_vocab_16e6.txt.gz"))
 
     # Create visual components
     compile_mode = "default" if compile else None

@@ -142,6 +142,8 @@ sam3_logs/
 # Logs
 logs/
 runs/
+data/
+outputs/
 tensorboard/
 
 # OS specific

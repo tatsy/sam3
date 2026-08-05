@@ -1,86 +1,110 @@
-[build-system]
-requires = ["setuptools>=61", "wheel"]
-build-backend = "setuptools.build_meta"
-
 [project]
 name = "sam3"
 dynamic = ["version"]
 description = "SAM3 (Segment Anything Model 3) implementation"
 readme = "README.md"
-requires-python = ">=3.8"
-license = {file = "LICENSE"}
-authors = [
-    {name = "Meta AI Research"}
-]
+requires-python = ">=3.10"
+license = { file = "LICENSE" }
+authors = [{ name = "Meta AI Research" }]
 classifiers = [
-    "Development Status :: 4 - Beta",
-    "Intended Audience :: Science/Research",
-    "License :: OSI Approved :: MIT License",
-    "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.8",
-    "Programming Language :: Python :: 3.9",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
-    "Programming Language :: Python :: 3.12",
-    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Science/Research",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.8",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
 dependencies = [
-    "timm>=1.0.17",
-    "numpy>=1.26,<2",
-    "tqdm",
-    "ftfy==6.1.1",
-    "regex",
-    "iopath>=0.1.10",
-    "typing_extensions",
-    "huggingface_hub",
-]
-
-[project.optional-dependencies]
-dev = [
-    "pytest",
-    "pytest-cov",
-    "black==24.2.0",
-    "ufmt==2.8.0",
-    "ruff-api==0.1.0",
-    "usort==1.0.2",
-    "gitpython==3.1.31",
-    "yt-dlp",
-    "pandas",
-    "opencv-python",
-    "pycocotools",
-    "numba",
-    "python-rapidjson",
-]
-notebooks = [
-    "matplotlib",
-    "jupyter",
-    "notebook",
-    "ipywidgets",
-    "ipycanvas",
-    "ipympl",
-    "pycocotools",
-    "decord",
-    "opencv-python",
-    "einops",
-    "scikit-image",
-    "scikit-learn",
-]
-train = [
-    "hydra-core",
-    "submitit",
-    "tensorboard",
-    "zstandard",
-    "scipy",
-    "torchmetrics",
-    "fvcore",
-    "fairscale",
-    "scikit-image",
-    "scikit-learn",
+  "timm>=1.0.17",
+  "numpy>=1.26,<2",
+  "tqdm",
+  "PyYAML>=6.0",
+  "ftfy==6.1.1",
+  "regex",
+  "torch (>=2.10.0,<2.11.0)",
+  "iopath>=0.1.10",
+  "typing_extensions",
+  "huggingface_hub",
 ]
 
 [project.urls]
 "Homepage" = "https://github.com/facebookresearch/sam3"
 "Bug Tracker" = "https://github.com/facebookresearch/sam3/issues"
+
+[project.optional-dependencies]
+dev = [
+  "pytest",
+  "pytest-cov",
+  "black==24.2.0",
+  "ufmt==2.8.0",
+  "ruff-api==0.1.0",
+  "usort==1.0.2",
+  "gitpython==3.1.31",
+  "yt-dlp",
+  "pandas",
+  "opencv-python",
+  "pycocotools",
+  "numba",
+  "python-rapidjson",
+  "mypy",
+  "ruff",
+]
+notebooks = [
+  "matplotlib",
+  "jupyter",
+  "notebook",
+  "ipywidgets",
+  "ipykernel",
+  "ipycanvas",
+  "ipympl",
+  "pycocotools",
+  "decord",
+  "opencv-python",
+  "einops",
+  "scikit-image",
+  "scikit-learn",
+]
+train = [
+  "hydra-core",
+  "submitit",
+  "tensorboard",
+  "transformers",
+  "peft",
+  "zstandard",
+  "scipy",
+  "torchmetrics",
+  "fvcore",
+  "fairscale",
+  "scikit-image",
+  "scikit-learn",
+]
+
+[tool.uv.sources]
+torch = [
+  { marker = "sys_platform == 'win32'", index = "pytorch-cu128" },
+  { marker = "sys_platform == 'linux'", index = "pytorch-cu128" },
+  { marker = "sys_platform == 'darwin'", index = "pytorch-cpu" },
+]
+
+torchvision = [
+  { marker = "sys_platform == 'win32'", index = "pytorch-cu128" },
+  { marker = "sys_platform == 'linux'", index = "pytorch-cu128" },
+  { marker = "sys_platform == 'darwin'", index = "pytorch-cpu" },
+]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
 
 [tool.setuptools.packages.find]
 include = ["sam3*"]
@@ -90,22 +114,27 @@ exclude = ["build*", "scripts*", "examples*"]
 sam3 = ["assets/*.txt.gz"]
 
 [tool.setuptools.dynamic]
-version = {attr = "sam3.__version__"}
+version = { attr = "sam3.__version__" }
 
-[tool.black]
-line-length = 88
-target-version = ['py38', 'py39', 'py310', 'py311', 'py312']
-include = '\.pyi?$'
+[tool.ruff]
+target-version = "py310"
+line-length = 120
 
-[tool.isort]
-profile = "black"
-multi_line_output = 3
+[tool.ruff.format]
+quote-style = "single"
+indent-style = "space"
+line-ending = "lf"
 
-[tool.usort]
-first_party_detection = false
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "N", "B", "UP", "SIM"]
+ignore = ["N806", "N812", "SIM108"]
+fixable = ["ALL"]
+unfixable = ["F401", "F841"]
 
-[tool.ufmt]
-formatter = "ruff-api"
+[tool.ruff.lint.isort]
+length-sort = true
+lines-after-imports = 2
+split-on-trailing-comma = true
 
 [tool.mypy]
 python_version = "3.12"
@@ -116,17 +145,31 @@ disallow_incomplete_defs = true
 
 [[tool.mypy.overrides]]
 module = [
-    "torch.*",
-    "torchvision.*",
-    "timm.*",
-    "numpy.*",
-    "PIL.*",
-    "tqdm.*",
-    "ftfy.*",
-    "regex.*",
-    "iopath.*",
+  "torch.*",
+  "torchvision.*",
+  "timm.*",
+  "numpy.*",
+  "PIL.*",
+  "tqdm.*",
+  "ftfy.*",
+  "regex.*",
+  "iopath.*",
 ]
 ignore_missing_imports = true
+
+[build-system]
+requires = ["hatchling>=1.0.0"]
+build-backend = "hatchling.build"
+
+[tool.hatch.version]
+path = "sam3/__init__.py"
+
+[tool.hatch.envs.default]
+installer = "uv"
+
+[tool.hatch.build.targets.wheel]
+packages = ["sam3"]
+include = ["sam3/assets/*.txt.gz"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
