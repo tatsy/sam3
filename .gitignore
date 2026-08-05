@@ -143,6 +143,7 @@ sam3_logs/
 logs/
 runs/
 data/
+models/
 outputs/
 tensorboard/
 
