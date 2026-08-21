@@ -6,6 +6,7 @@ labels:
     mask_threshold: 0.5
     min_area_ratio: 0.0002
     max_area_ratio: 0.40
+    confidence_threshold: 0.35
 
   - name: nectarine
     prompts:
@@ -13,6 +14,7 @@ labels:
     mask_threshold: 0.5
     min_area_ratio: 0.0002
     max_area_ratio: 0.40
+    confidence_threshold: 0.35
 
   - name: cereals
     prompts:
@@ -20,6 +22,7 @@ labels:
     mask_threshold: 0.5
     min_area_ratio: 0.00005
     max_area_ratio: 0.60
+    confidence_threshold: 0.35
 
   - name: banana_chips
     prompts:
@@ -27,6 +30,7 @@ labels:
     mask_threshold: 0.5
     min_area_ratio: 0.00002
     max_area_ratio: 0.20
+    confidence_threshold: 0.35
 
   - name: almonds
     prompts:
@@ -34,6 +38,7 @@ labels:
     mask_threshold: 0.5
     min_area_ratio: 0.00003
     max_area_ratio: 0.30
+    confidence_threshold: 0.35
 
   - name: white_box
     prompts:
@@ -41,6 +46,7 @@ labels:
     mask_threshold: 0.5
     min_area_ratio: 0.01
     max_area_ratio: 0.98
+    confidence_threshold: 0.35
 
   # pushpins
   - name: pushpin
@@ -50,6 +56,7 @@ labels:
     mask_threshold: 0.5
     min_area_ratio: 0.00005
     max_area_ratio: 0.35
+    confidence_threshold: 0.35
 
   - name: plastic_tray
     prompts:
@@ -58,6 +65,7 @@ labels:
     mask_threshold: 0.5
     min_area_ratio: 0.10
     max_area_ratio: 0.98
+    confidence_threshold: 0.35
 
   # juice_bottle
   - name: bottle
@@ -66,6 +74,7 @@ labels:
     mask_threshold: 0.5
     min_area_ratio: 0.03
     max_area_ratio: 0.90
+    confidence_threshold: 0.35
 
   - name: glass
     prompts:
@@ -73,6 +82,7 @@ labels:
     mask_threshold: 0.5
     min_area_ratio: 0.01
     max_area_ratio: 0.85
+    confidence_threshold: 0.35
 
   - name: red_liquid
     prompts:
@@ -80,6 +90,7 @@ labels:
     mask_threshold: 0.5
     min_area_ratio: 0.005
     max_area_ratio: 0.70
+    confidence_threshold: 0.35
 
   - name: yellow_liquid
     prompts:
@@ -87,6 +98,7 @@ labels:
     mask_threshold: 0.5
     min_area_ratio: 0.005
     max_area_ratio: 0.70
+    confidence_threshold: 0.35
 
   - name: milky_liquid
     prompts:
@@ -94,6 +106,7 @@ labels:
     mask_threshold: 0.5
     min_area_ratio: 0.005
     max_area_ratio: 0.70
+    confidence_threshold: 0.35
 
   - name: bottle_label
     prompts:
@@ -101,6 +114,7 @@ labels:
     mask_threshold: 0.5
     min_area_ratio: 0.001
     max_area_ratio: 0.40
+    confidence_threshold: 0.35
 
   - name: cherry_illust
     prompts:
@@ -108,6 +122,7 @@ labels:
     mask_threshold: 0.5
     min_area_ratio: 0.00002
     max_area_ratio: 0.15
+    confidence_threshold: 0.35
 
   - name: orange_illust
     prompts:
@@ -115,6 +130,7 @@ labels:
     mask_threshold: 0.5
     min_area_ratio: 0.00002
     max_area_ratio: 0.15
+    confidence_threshold: 0.35
 
   - name: banana_illust
     prompts:
@@ -122,6 +138,7 @@ labels:
     mask_threshold: 0.5
     min_area_ratio: 0.00002
     max_area_ratio: 0.15
+    confidence_threshold: 0.35
 
   # screw_bag
   - name: screw
@@ -130,6 +147,7 @@ labels:
     mask_threshold: 0.5
     min_area_ratio: 0.00010
     max_area_ratio: 0.20
+    confidence_threshold: 0.35
 
   - name: hex_nut
     prompts:
@@ -137,6 +155,7 @@ labels:
     mask_threshold: 0.5
     min_area_ratio: 0.00005
     max_area_ratio: 0.10
+    confidence_threshold: 0.35
 
   - name: washer
     prompts:
@@ -144,6 +163,7 @@ labels:
     mask_threshold: 0.5
     min_area_ratio: 0.00005
     max_area_ratio: 0.10
+    confidence_threshold: 0.35
 
   - name: plastic_bag
     prompts:
@@ -151,6 +171,7 @@ labels:
     mask_threshold: 0.5
     min_area_ratio: 0.02
     max_area_ratio: 0.95
+    confidence_threshold: 0.35
 
   # splicing_connectors
   - name: splicing_connector
@@ -159,6 +180,7 @@ labels:
     mask_threshold: 0.5
     min_area_ratio: 0.00010
     max_area_ratio: 0.25
+    confidence_threshold: 0.35
 
   - name: yellow_cable
     prompts:
@@ -166,6 +188,7 @@ labels:
     mask_threshold: 0.5
     min_area_ratio: 0.00003
     max_area_ratio: 0.25
+    confidence_threshold: 0.35
 
   - name: blue_cable
     prompts:
@@ -173,6 +196,7 @@ labels:
     mask_threshold: 0.5
     min_area_ratio: 0.00003
     max_area_ratio: 0.25
+    confidence_threshold: 0.35
 
   - name: red_cable
     prompts:
@@ -180,6 +204,7 @@ labels:
     mask_threshold: 0.5
     min_area_ratio: 0.00003
     max_area_ratio: 0.25
+    confidence_threshold: 0.35
 
   - name: grid
     prompts:
@@ -187,3 +212,4 @@ labels:
     mask_threshold: 0.5
     min_area_ratio: 0.05
     max_area_ratio: 0.98
+    confidence_threshold: 0.35

@@ -422,11 +422,13 @@ class Sam3ForPromptSegmentation(nn.Module):
         sam3: nn.Module,
         focal_weight: float = 1.0,
         dice_weight: float = 1.0,
+        presence_weight: float = 0.25,
     ) -> None:
         super().__init__()
         self.sam3 = sam3
         self.focal_weight = focal_weight
         self.dice_weight = dice_weight
+        self.presence_weight = presence_weight
 
     def forward(
         self,
@@ -476,7 +478,14 @@ class Sam3ForPromptSegmentation(nn.Module):
             targets,
         )
 
-        loss = self.focal_weight * focal + self.dice_weight * dice
+        presence_target = targets.flatten(1).any(dim=1).float()
+        presence_logits = outputs.presence_logits.reshape(-1).float()
+        presence_loss = F.binary_cross_entropy_with_logits(
+            presence_logits,
+            presence_target,
+        )
+
+        loss = self.focal_weight * focal + self.dice_weight * dice + self.presence_weight * presence_loss
 
         return {'loss': loss, 'logits': logits}
 
@@ -774,7 +783,7 @@ def main() -> None:
         image_ids=train_ids,
         prompt_by_category=prompt_by_category,
         augment=Sam3SegmentationAugment(),
-        negative_ratio=0.5,
+        negative_ratio=1.0,
         include_all_negatives=False,
         randomize_prompts=True,
         seed=args.seed,
