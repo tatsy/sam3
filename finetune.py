@@ -269,7 +269,7 @@ class Sam3ForPromptSegmentation(nn.Module):
         if labels is None:
             return result
 
-        # Processorは[B, Hmask, Wmask]を返します。
+        # Processor return the tensor with shape [B, Hmask, Wmask]
         targets = (labels > 0).float().unsqueeze(1)
 
         if targets.shape[-2:] != logits.shape[-2:]:
@@ -279,7 +279,7 @@ class Sam3ForPromptSegmentation(nn.Module):
                 mode='nearest',
             )
 
-        # lossだけfloat32で計算すると数値的に安定します。
+        # Calculate loss with float32 for numerical stability
         loss_logits = logits.float()
         targets = targets.float()
 
@@ -301,10 +301,7 @@ class Sam3ForPromptSegmentation(nn.Module):
         return {'loss': loss, 'logits': logits}
 
 
-def preprocess_logits_for_metrics(
-    logits: torch.Tensor | tuple,
-    labels: torch.Tensor,
-) -> torch.Tensor:
+def preprocess_logits_for_metrics(logits: torch.Tensor | tuple, labels: torch.Tensor) -> torch.Tensor:
     # Trainer may supply a tuple for models with multiple outputs.
     if isinstance(logits, (tuple, list)):
         logits = logits[0]
@@ -318,9 +315,7 @@ def preprocess_logits_for_metrics(
     return logits.float()
 
 
-def find_lora_target_modules(
-    model: nn.Module,
-) -> list[str]:
+def find_lora_target_modules(model: nn.Module) -> list[str]:
     """Select attention projections outside the text encoder."""
 
     target_prefixes = (
@@ -340,7 +335,7 @@ def find_lora_target_modules(
 
         lower_name = name.lower()
 
-        # q_proj/v_proj等に加えてDETRのout_projも拾います。
+        # Extract q_proj/v_proj and out_proj of DETR
         if 'attn' not in lower_name and 'attention' not in lower_name:
             continue
 
@@ -487,10 +482,7 @@ def main() -> None:
     args = parse_args()
     args.output_dir.mkdir(parents=True, exist_ok=True)
 
-    with args.coco_json.open(
-        'r',
-        encoding='utf-8',
-    ) as file:
+    with args.coco_json.open('r', encoding='utf-8') as file:
         coco_data = json.load(file)
 
     print('COCO categories:')
@@ -550,11 +542,9 @@ def main() -> None:
         fp16=not use_bf16,
         tf32=True,
         eval_strategy='epoch',
-        # Wrapper全体の巨大checkpoint保存を避け、
-        # 最後にPEFT adapterだけを保存します。
         save_strategy='no',
         logging_steps=5,
-        report_to=[],
+        report_to=['no'],
         remove_unused_columns=False,
         label_names=['labels'],
         dataloader_num_workers=0,
