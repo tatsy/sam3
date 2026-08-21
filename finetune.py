@@ -379,8 +379,6 @@ def build_model(
         lora_dropout=0.05,
         target_modules=target_modules,
         bias='none',
-        # semantic segmentationの最終projectionは
-        # LoRAではなく通常の重みとして学習・保存します。
         modules_to_save=['semantic_projection'],
     )
 
@@ -473,46 +471,14 @@ def split_image_ids(
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
 
-    parser.add_argument(
-        '--coco-json',
-        type=Path,
-        required=True,
-    )
-    parser.add_argument(
-        '--image-root',
-        type=Path,
-        required=True,
-    )
-    parser.add_argument(
-        '--output-dir',
-        type=Path,
-        required=True,
-    )
-    parser.add_argument(
-        '--model-name',
-        type=str,
-        default='facebook/sam3',
-    )
-    parser.add_argument(
-        '--epochs',
-        type=int,
-        default=10,
-    )
-    parser.add_argument(
-        '--learning-rate',
-        type=float,
-        default=1e-4,
-    )
-    parser.add_argument(
-        '--lora-rank',
-        type=int,
-        default=8,
-    )
-    parser.add_argument(
-        '--seed',
-        type=int,
-        default=42,
-    )
+    parser.add_argument('--coco-json', type=Path, required=True)
+    parser.add_argument('--image-root', type=Path, required=True)
+    parser.add_argument('--output-dir', type=Path, required=True)
+    parser.add_argument('--model-name', type=str, default='facebook/sam3')
+    parser.add_argument('--epochs', type=int, default=10)
+    parser.add_argument('--learning-rate', type=float, default=2e-5)
+    parser.add_argument('--lora-rank', type=int, default=16)
+    parser.add_argument('--seed', type=int, default=42)
 
     return parser.parse_args()
 
