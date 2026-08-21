@@ -1,0 +1,92 @@
+labels:
+  - name: bottle
+    prompts:
+      - juice bottle
+      - glass bottle
+      - bottle
+    confidence_threshold: 0.25
+    mask_threshold: 0.45
+    min_area_ratio: 0.03
+    max_area_ratio: 0.90
+
+  - name: glass
+    prompts:
+      - bottle glass
+      - glass body of bottle
+      - transparent glass bottle body
+    confidence_threshold: 0.20
+    mask_threshold: 0.40
+    min_area_ratio: 0.01
+    max_area_ratio: 0.85
+
+  - name: red_liquid
+    prompts:
+      - red liquid
+      - red juice
+      - cherry juice
+    confidence_threshold: 0.20
+    mask_threshold: 0.40
+    min_area_ratio: 0.005
+    max_area_ratio: 0.70
+
+  - name: yellow_liquid
+    prompts:
+      - yellow liquid
+      - yellow juice
+      - orange juice
+    confidence_threshold: 0.20
+    mask_threshold: 0.40
+    min_area_ratio: 0.005
+    max_area_ratio: 0.70
+
+  - name: milky_liquid
+    prompts:
+      - milky liquid
+      - white liquid
+      - opaque white juice
+    confidence_threshold: 0.20
+    mask_threshold: 0.40
+    min_area_ratio: 0.005
+    max_area_ratio: 0.70
+
+  - name: bottle_label
+    prompts:
+      - bottle label
+      - product label
+      - label on bottle
+      - bottle tag
+    confidence_threshold: 0.20
+    mask_threshold: 0.40
+    min_area_ratio: 0.001
+    max_area_ratio: 0.40
+
+  - name: cherry
+    prompts:
+      - cherry
+      - cherry fruit
+      - cherry image on label
+    confidence_threshold: 0.15
+    mask_threshold: 0.35
+    min_area_ratio: 0.00002
+    max_area_ratio: 0.15
+
+  - name: orange
+    prompts:
+      - orange fruit
+      - tangerine
+      - orange image on label
+      - tangerine image on label
+    confidence_threshold: 0.15
+    mask_threshold: 0.35
+    min_area_ratio: 0.00002
+    max_area_ratio: 0.15
+
+  - name: banana
+    prompts:
+      - banana
+      - banana fruit
+      - banana image on label
+    confidence_threshold: 0.15
+    mask_threshold: 0.35
+    min_area_ratio: 0.00002
+    max_area_ratio: 0.15

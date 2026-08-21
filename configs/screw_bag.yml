@@ -1,0 +1,42 @@
+labels:
+  - name: screw
+    prompts:
+      - screw
+      - metal screw
+      - hex screw
+      - hexagon bolt
+    confidence_threshold: 0.25
+    mask_threshold: 0.45
+    min_area_ratio: 0.00010
+    max_area_ratio: 0.20
+
+  - name: hex_nut
+    prompts:
+      - hex nut
+      - hexagon nut
+      - metal nut
+    confidence_threshold: 0.25
+    mask_threshold: 0.45
+    min_area_ratio: 0.00005
+    max_area_ratio: 0.10
+
+  - name: washer
+    prompts:
+      - washer
+      - ring washer
+      - metal washer
+      - ring gasket
+    confidence_threshold: 0.25
+    mask_threshold: 0.45
+    min_area_ratio: 0.00005
+    max_area_ratio: 0.10
+
+  - name: plastic_bag
+    prompts:
+      - transparent plastic bag
+      - plastic bag
+      - clear plastic bag
+    confidence_threshold: 0.25
+    mask_threshold: 0.40
+    min_area_ratio: 0.02
+    max_area_ratio: 0.95
